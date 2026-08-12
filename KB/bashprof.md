@@ -1,89 +1,114 @@
-# Placing a call in its tree
+# A call tree that travels
 
 `tests/examples/bashprof/`, `tests/examples/bash/bashprof.bash`
 
-A worked rig that times a tree of CPS calls. The instrument is nine lines of
-bash and measures nothing:
+A worked rig that times a tree of CPS calls. The instrument measures nothing
+and infers nothing: the wire stamps every message with the sending shell's
+`$EPOCHREALTIME` and pid, `__bc_stack` appends the frame walk, and the wrapper
+adds the two words that make the tree an observation rather than a
+reconstruction.
 
 ```bash
 BASHPROF_TIME_CPS() {
     local __BP_label="${1-}"
     shift || __BC_THROW
 
-    local -a __BP_begin=(BEGIN label "$__BP_label")
+    __BP_made=$(( __BP_made + 1 ))
+    local __BP_id="$BASHPID.$__BP_made"
+
+    local -a __BP_begin=(BEGIN id "$__BP_id" inside "${__BP_inside-}" label "$__BP_label")
     __bc_stack __BP_begin 2
 
     BC_INSTR say TIME_CPS "${__BP_begin[@]}" || __BC_BAIL
 
+    local __BP_inside="$__BP_id"
+
     "$@"
     local __BP_rc=$?
 
-    BC_INSTR say TIME_CPS END || __BC_BAIL
+    BC_INSTR say TIME_CPS END id "$__BP_id" || __BC_BAIL
 
     return "$__BP_rc"
 }
 ```
 
-The wire stamps every message with the sending shell's `$EPOCHREALTIME` and its
-pid, and `__bc_stack` appends the frame walk — so a message already carries
-when, where and by whom. **Everything downstream is a reading of that**, in
-passes over what the run heard:
-
 | pass | | |
 |---|---|---|
-| `rig::shells` | messages → shells | `seq == 0` opens one |
-| `recording` | a shell's messages → records, already placed | BEGIN opens, END closes the one it opened |
-| `nesting` | placed records → a forest | one `Treeish` + one `vec_fold` |
+| `recording` | messages → flat records | one pass, one map from name to call |
+| `nesting` | records → a forest | one index, then `Treeish` + `vec_fold` |
 | `profile` | that forest → timings | one `vec_fold` |
 
-The session is `Vec<Line>`; `hear` keeps. Nothing is accumulated as messages
-arrive, because nothing has to be — provenance rides along.
+The session is `Vec<Line>`; `hear` keeps. Nothing is grouped by shell, nothing
+is paired by position, and nothing depends on the order messages arrived in.
 
-## The wrapper places the call
+## The hand-off is the whole mechanism
 
-`BASHPROF_TIME_CPS` sends BEGIN, runs the call, sends END. So within one shell
-the calls **are** a stack, and a BEGIN belongs to whatever that shell had open
-— the same stack the pairing already keeps:
+`local __BP_inside="$__BP_id"` sits **after** the BEGIN is sent and **before**
+the call is run. That ordering is the design:
 
-```rust
-let inside = match stack.last() {
-    Some(&enclosing) => Some(enclosing),
-    None => forked_into(&call, index, forked_from, opened),
-};
+- reading `${__BP_inside-}` for the payload happens while the name in scope is
+  still the caller's, so a call reports the call it was made inside of;
+- declaring it `local` puts the new name in this frame, so everything `"$@"`
+  reaches reads it by dynamic scoping — see [scoping.md](scoping.md);
+- **a fork inherits it** along with the rest of the shell image, so the edge
+  crosses a process boundary with nothing to reconstruct.
+
+Unmeasured code between two measured calls is transparent to this: it neither
+sets nor shadows the name, so a call made ten frames below the last measured
+one still names that one.
+
+## Why the name is `$BASHPID` and a count
+
+Two calls under one name would close each other's spans and claim each other's
+children. The name has to be unique across a run's whole process tree, and the
+two halves cover the two ways it could fail:
+
+- **`$BASHPID`** is the one value that differs in every process, by definition.
+- **`__BP_made`**, deliberately not `local`, is one count per shell spanning
+  every call that shell makes. A fork inherits the count and advances its own
+  copy — under its own pid, so the two never meet.
+
+`$RANDOM` cannot do either job, and drawing more of it does not help. The
+failure mode is not a birthday collision but **determinism after fork**: a
+subshell inherits the generator's state, so two forks made from one point draw
+the same sequence, and `${RANDOM}${RANDOM}${RANDOM}` appends the same digits in
+both. Bash 5 happens to reseed in a subshell — measured on 5.3.9 — but the
+manual documents only "seeding with the same constant value produces the same
+sequence", and bash 4 does not reseed.
+
+What remains is pid reuse inside one run, which would take the OS cycling the
+whole pid space in the seconds a profiled run lasts. That is not guarded
+against; it is **detected**, because a second call under one name is refused
+where the names are read.
+
+## What the reading owes
+
+Three lookups, and every one of them the instrument's fault if it fails:
+
+| | |
+|---|---|
+| a name is given once | a second BEGIN under one name is refused |
+| a name is ended once | a second END for one name is refused |
+| every name pointed at was given | a call made inside a name that never began is refused |
+
+Nothing else can go wrong in the placement, because nothing else is decided
+there. In particular there is no ambiguity to report: the shell said where the
+call belongs.
+
+## The frames, then
+
+Nothing places a call by them any more, and they stay. Each record carries the
+subject's whole stack with exactly two frames dropped — `__bc_stack`'s own and
+the wrapper's — so every node has one definite site, and the wrapper's *other*
+frames remain because that is where the calls above it are executing:
+
+```
+c   at    f__B
+    outer BASHPROF_TIME_CPS, f__A, BASHPROF_TIME_CPS, main
 ```
 
-Nothing is searched for and nothing can be ambiguous: a shell's open calls are
-a chain, never a set. A shell either returns from a call or dies inside it, so
-what is left open when its messages run out is the latter — and calls made
-inside it are already placed there, which is why an error node has children
-here where the resolver's cannot.
-
-Reconstructing this by comparing frame stacks across every record in the run is
-the mistake to avoid. It widens the candidate set to things the wrapper had
-already excluded, and then needs machinery to exclude them again.
-
-## Where a fork attaches
-
-A fork is the one thing the stack does not cover: it inherits the frames but
-begins a stack of its own. A call that opens a fork's stack therefore attaches
-into the shell it was forked from — the innermost call still running there,
-walking up `rig::forked_from` until a shell has one.
-
-The frames pick it, and this is the only place they are compared:
-
-```rust
-call.made_inside(&open.call)     // open's site is a strict suffix of call's
-```
-
-A shell blocked on a fork has the same call open throughout, so the choice is
-forced. A shell that forked in the *background* may have begun another call
-since — and one begun after the fork is not one the inherited site was ever
-made under, so it does not match and the walk passes it. That is the whole of
-what `&` costs, and it costs it in one `find`.
-
-Shells that never spoke are transparent to all of this: they are not in
-`shells()`, and `__BC__owner` is inherited past them, so the fork chain links
-the shells that have calls to place.
+`Span::at` reports the innermost of these, which is what tells two calls made
+from one function apart.
 
 ## Time a span had to itself
 
@@ -111,7 +136,7 @@ need not. That choice is made once, at the top.
 
 ## See also
 
-- [tree.md](tree.md) — `shells`, `forked_from`, and why the relation is acyclic
+- [scoping.md](scoping.md) — the frame `__BP_inside` is declared in, and why
 - [stack.md](stack.md) — the frame walk both instruments share
-- [scoping.md](scoping.md) — why the instrument's locals are declared where they are
+- [wire.md](wire.md#the-message) — the provenance every message carries already
 - [rig.md](rig.md#what-a-session-is-for) — the session this one keeps
