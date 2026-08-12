@@ -20,8 +20,18 @@ use super::record::{Call, Id, Record};
 /// The word this instrument's messages begin with.
 const TAG: &str = "TIME_CPS";
 
+/// One call the run made, and the name its shell said it was made inside of.
+///
+/// That name is what [`nest`](super::nest) reads, and what the tree it builds
+/// then holds in its own shape — so it stops here rather than riding along on
+/// a node that already says the same thing by where it sits.
+pub(super) struct Read {
+    pub record: Record,
+    pub inside: Option<Id>,
+}
+
 /// Every call the run made, in the order they began.
-pub fn records(heard: &[Line]) -> Result<Vec<Record>, Failure> {
+pub(super) fn records(heard: &[Line]) -> Result<Vec<Read>, Failure> {
     let mut reading = Reading::default();
 
     for line in heard {
@@ -35,6 +45,7 @@ pub fn records(heard: &[Line]) -> Result<Vec<Record>, Failure> {
 /// arrives, and a shell that dies inside it never sends one.
 struct Open {
     call: Call,
+    inside: Option<Id>,
     ended: Option<Micros>,
 }
 
@@ -66,13 +77,13 @@ impl Reading {
     /// spans and claim each other's children, so it is refused here rather
     /// than read as a tree nothing produced.
     fn begin(&mut self, line: &Line, rest: &[String]) -> Result<(), Failure> {
-        let call = began(line, rest)?;
+        let (call, inside) = began(line, rest)?;
 
         if self.at.insert(call.id.clone(), self.opened.len()).is_some() {
             return Err(reading(format!("a second call named {}", call.id)));
         }
 
-        self.opened.push(Open { call, ended: None });
+        self.opened.push(Open { call, inside, ended: None });
         Ok(())
     }
 
@@ -90,27 +101,30 @@ impl Reading {
 
     /// The calls as records, oldest first — once every name they point at is
     /// one that was given.
-    fn settled(self) -> Result<Vec<Record>, Failure> {
+    fn settled(self) -> Result<Vec<Read>, Failure> {
         let Reading { opened, at } = self;
 
         let named_but_absent = opened
             .iter()
-            .filter_map(|open| open.call.inside.as_ref().map(|inside| (&open.call.id, inside)))
+            .filter_map(|open| open.inside.as_ref().map(|inside| (&open.call.id, inside)))
             .find(|(_, inside)| !at.contains_key(inside));
 
         if let Some((call, missing)) = named_but_absent {
             return Err(reading(format!("{call} was made inside {missing}, which never began")));
         }
 
-        let mut records: Vec<Record> = opened
+        let mut records: Vec<Read> = opened
             .into_iter()
-            .map(|Open { call, ended }| match ended {
-                Some(ended) => Record::Ended { call, ended },
-                None => Record::Unended { call },
+            .map(|Open { call, inside, ended }| Read {
+                record: match ended {
+                    Some(ended) => Record::Ended { call, ended },
+                    None => Record::Unended { call },
+                },
+                inside,
             })
             .collect();
 
-        records.sort_by_key(|record| (record.call().began, record.call().pid.0));
+        records.sort_by_key(|read| (read.record.call().began, read.record.call().pid.0));
         Ok(records)
     }
 }
@@ -120,7 +134,9 @@ fn named(rest: &[String]) -> Result<Id, Failure> {
     field(rest, "id").map(|id| Id(id.to_string())).ok_or_else(|| reading("a message with no id"))
 }
 
-fn began(line: &Line, rest: &[String]) -> Result<Call, Failure> {
+/// The call one BEGIN reports, and the name it says encloses it. The outermost
+/// call is made inside nothing, and says so with a name it leaves empty.
+fn began(line: &Line, rest: &[String]) -> Result<(Call, Option<Id>), Failure> {
     let word = |key: &str| {
         field(rest, key).ok_or_else(|| reading(format!("a BEGIN with no {key:?}"))).map(str::to_string)
     };
@@ -128,17 +144,16 @@ fn began(line: &Line, rest: &[String]) -> Result<Call, Failure> {
     let mut frames = Columns::of(rest)?.frames()?.into_iter();
     let at = frames.next().ok_or_else(|| reading("a walk with no frames"))?;
 
-    Ok(Call {
+    let call = Call {
         id: named(rest)?,
-        // The outermost call is made inside nothing, and says so with a name
-        // it leaves empty.
-        inside: Some(word("inside")?).filter(|inside| !inside.is_empty()).map(Id),
         label: word("label")?,
         pid: line.pid,
         began: line.sent_at,
         at,
         outer: frames.collect(),
-    })
+    };
+
+    Ok((call, Some(word("inside")?).filter(|inside| !inside.is_empty()).map(Id)))
 }
 
 fn reading(what: impl Into<String>) -> Failure {

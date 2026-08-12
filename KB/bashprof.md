@@ -11,26 +11,29 @@ reconstruction.
 ## The tool
 
 ```
-bashprof --into FILE [--output tree|tree-with-err|raw] -- <command…>
+bashprof --into FILE [--output human|tree|tree-with-err|raw] -- <command…>
 ```
 
-`--output` chooses **how far the run is read** before it is written:
+`--output` chooses **how far the run is read**, and in what:
 
 | `--output` | the file holds | refuses |
 |---|---|---|
-| `tree` (default) | `Profile` — a JSON array of root spans | a run with a call the shell died inside |
+| `human` (default) | the measured tree indented, one call per line | a run with a call the shell died inside |
+| `tree` | the same reading as a JSON array of root `Span`s | the same |
 | `tree-with-err` | `Vec<Recorded>` — every call that began, each tagged `"state": "ended"` or `"unended"` | nothing the reading can express |
 | `raw` | every `Line` the run heard, one JSON object per line | nothing |
 
-Only `tree` refuses, and only for that one reason: every entry of it claims a
-duration, and a call that never ended has none. Everything the three share — a
-message the recording refuses, a transport that broke — fails in all of them.
+`human` and `tree` are one reading in two hands, and the only one that can
+refuse: every entry of it claims a duration, and a call that never ended has
+none. What the four share — a message the recording refuses, a transport that
+broke — fails in all of them.
 
-Every shape is a derived `Serialize` over the type named in that row; the JSON
-is the struct, and a method is not a field. `Span::inclusive` and
-`Span::exclusive` are therefore not in it — `began` and `ended` are, and what
+Each JSON shape is a derived `Serialize` over the type named in its row. The
+JSON is the struct, and a method is not a field: `Span::inclusive` and
+`Span::exclusive` are therefore not in it, `began` and `ended` are, and what
 `exclusive` does to the children is described under
-[time a span had to itself](#time-a-span-had-to-itself).
+[time a span had to itself](#time-a-span-had-to-itself). `human` is the same
+reading through `Profile`'s `Display`, which does print both.
 
 ### The subject owns both streams
 
@@ -144,12 +147,19 @@ where the names are read.
 
 | pass | | |
 |---|---|---|
-| `recording` | messages → flat records | one pass, one map from name to call |
-| `nesting` | records → a forest | one index, then `Treeish` + `vec_fold` |
+| `recording` | messages → flat records, each with the name it was told encloses it | one pass, one map from name to call |
+| `nesting` | those → a forest, the names spent | one index, then `Treeish` + `vec_fold` |
 | `profile` | that forest → timings | one `vec_fold` |
 
 The session is `Vec<Line>`; `hear` keeps. Nothing is grouped by shell, nothing
 is paired by position, and nothing depends on the order messages arrived in.
+
+`recorded()` is the whole reading and the only entry point; what passes between
+the passes is nobody else's. **The enclosing name does not reach the tree.** It
+is what `nest` reads, and where a node sits is what the tree then holds — a
+node carrying it as well would be one fact with two sources, free to disagree
+with the shape it was used to build. So it rides on `recording::Read` and
+stops there; `Call` is the call, not its wiring.
 
 ## What the reading owes
 

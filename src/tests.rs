@@ -15,7 +15,6 @@ use super::record::{Call, Id, Record};
 fn call(label: &str, began: u64) -> Call {
     Call {
         id: Id(format!("1.{began}")),
-        inside: None,
         label: label.into(),
         pid: Pid(1),
         began: Micros(began),

@@ -27,11 +27,6 @@ impl fmt::Display for Id {
 #[derive(Debug, Clone, Serialize)]
 pub struct Call {
     pub id: Id,
-
-    /// The call this one was made inside of, as the shell that made it said
-    /// so. `None` where nothing measured encloses it.
-    pub inside: Option<Id>,
-
     pub label: String,
     pub pid: Pid,
     pub began: Micros,

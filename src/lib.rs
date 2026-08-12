@@ -21,14 +21,14 @@
 //! # Ok::<(), mb_resolver::bash::rig::Failure>(())
 //! ```
 //!
-//! The modules are private and this list of exports is the API; each is one
-//! step of the reading.
+//! The modules are private, and [`recorded`] is the whole reading. Each module
+//! is one step of it, and what passes between them is nobody else's:
 //!
 //! | | |
 //! |---|---|
-//! | `record` | one call, how it went, and the call it was made inside of |
-//! | `recording` | the wire read as flat records — one pass and a map |
-//! | `nesting` | those records read as a tree — one hylic unfold |
+//! | `record` | one call and how it went |
+//! | `recording` | the wire read as flat records, each with the name it was told encloses it — one pass and a map |
+//! | `nesting` | those records read as a tree, which spends the names — one hylic unfold |
 //! | `profile` | that tree read as timings — one hylic fold |
 //! | `render` | hylic's tree formatter, for either tree |
 
@@ -42,10 +42,12 @@ mod render;
 use crate::bash::rig::{Failure, Line, Rig, Startup};
 
 pub use instrument::instrument;
-pub use nesting::{nest, Recorded};
+pub use nesting::Recorded;
 pub use profile::{Profile, Span, Unfinished};
 pub use record::{Call, Id, Record};
-pub use recording::records;
+
+use nesting::nest;
+use recording::records;
 
 #[cfg(test)]
 mod tests;

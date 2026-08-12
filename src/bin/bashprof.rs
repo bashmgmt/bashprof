@@ -16,8 +16,8 @@ struct Cli {
     #[arg(long)]
     into: PathBuf,
 
-    /// How far the run is read before it is written.
-    #[arg(long, value_enum, default_value_t = Output::Tree)]
+    /// How far the run is read before it is written, and in what.
+    #[arg(long, value_enum, default_value_t = Output::Human)]
     output: Output,
 
     /// The wrapped command, program included — `bash build.bash`, or
@@ -30,9 +30,10 @@ struct Cli {
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
 enum Output {
-    /// The measured tree: a JSON array of root spans. A call the shell died
-    /// inside leaves no measurement, so this refuses rather than write a tree
-    /// that is quietly missing time.
+    /// The measured tree, indented, one call per line.
+    Human,
+
+    /// The same tree as a JSON array of root spans.
     Tree,
 
     /// The recorded tree: the same array with every call that began, each
@@ -94,9 +95,10 @@ fn write(into: &Path, text: String) -> Result<(), Failure> {
 
 /// What goes into the file, or what stopped it being knowable.
 ///
-/// Only `Tree` refuses an unfinished run: it is the one reading whose every
-/// entry claims a duration, and a call the shell died inside has none. The
-/// other two report what the run said, which is defined however it ended.
+/// `Human` and `Tree` are one reading in two hands, and the only one that can
+/// refuse: every entry of it claims a duration, and a call the shell died
+/// inside has none. The other two report what the run said, which is defined
+/// however it ended.
 fn written(output: Output, heard: &[Line]) -> Result<String, Failure> {
     match output {
         Output::Raw => heard
@@ -109,16 +111,19 @@ fn written(output: Output, heard: &[Line]) -> Result<String, Failure> {
             .map(|lines| lines.join("\n")),
 
         Output::TreeWithErr => json(&recorded(heard)?),
-
-        Output::Tree => {
-            let forest = recorded(heard)?;
-            let reading = |unfinished: Unfinished<'_>| {
-                Failure::new("reading the run as measurements", unfinished.to_string())
-            };
-
-            json(&Profile::of(&forest).map_err(reading)?)
-        }
+        Output::Human => measured(heard).map(|profile| profile.to_string()),
+        Output::Tree => measured(heard).and_then(|profile| json(&profile)),
     }
+}
+
+/// The run read as measurements, or why it has none to give.
+fn measured(heard: &[Line]) -> Result<Profile, Failure> {
+    let forest = recorded(heard)?;
+    let reading = |unfinished: Unfinished<'_>| {
+        Failure::new("reading the run as measurements", unfinished.to_string())
+    };
+
+    Profile::of(&forest).map_err(reading)
 }
 
 fn json<T: serde::Serialize>(what: &T) -> Result<String, Failure> {
