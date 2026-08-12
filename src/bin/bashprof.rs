@@ -1,45 +1,35 @@
 //! Run a bash command under the profiler and print the tree its measured
 //! calls made.
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 
 use mb_resolver::bash::rig::{run, ExitStatus, Failure};
-use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, POLYFILL};
+use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded};
 
 #[derive(Parser)]
 #[command(name = "bashprof", about = "Time a tree of calls in a bash program")]
 struct Cli {
-    #[command(subcommand)]
-    what: What,
-}
+    /// Print the tree as recorded — every call that began, ended or not —
+    /// rather than as timings.
+    #[arg(long)]
+    as_recorded: bool,
 
-#[derive(Subcommand)]
-enum What {
-    /// Run a bash command and print what it measured.
-    Run {
-        /// Print the tree as recorded — every call that began, ended or not —
-        /// rather than as timings.
-        #[arg(long)]
-        as_recorded: bool,
-
-        /// The wrapped command, program included — `bash build.bash`, or
-        /// `make test`, whose own shells join too. Everything from the first
-        /// plain word on is the subject's; a command that itself starts with a
-        /// dash goes behind `--`.
-        #[arg(trailing_var_arg = true, required = true)]
-        argv: Vec<String>,
-    },
-
-    /// Print the client-side no-op stub.
-    Polyfill,
+    /// The wrapped command, program included — `bash build.bash`, or
+    /// `make test`, whose own shells join too. Everything from the first
+    /// plain word on is the subject's; a command that itself starts with a
+    /// dash goes behind `--`.
+    #[arg(trailing_var_arg = true, required = true)]
+    argv: Vec<String>,
 }
 
 fn main() {
     let code = match Cli::try_parse() {
-        Ok(cli) => perform(cli.what).unwrap_or_else(|error| {
-            eprintln!("bashprof: {error}");
-            1
-        }),
+        Ok(cli) => profile(&cli.argv, cli.as_recorded)
+            .map(ExitStatus::shell_code)
+            .unwrap_or_else(|error| {
+                eprintln!("bashprof: {error}");
+                1
+            }),
         Err(complaint) => {
             let _ = complaint.print();
             2
@@ -47,18 +37,6 @@ fn main() {
     };
 
     std::process::exit(code);
-}
-
-fn perform(what: What) -> Result<i32, Failure> {
-    match what {
-        What::Polyfill => {
-            print!("{POLYFILL}");
-            Ok(0)
-        }
-        What::Run { as_recorded, argv } => {
-            profile(&argv, as_recorded).map(ExitStatus::shell_code)
-        }
-    }
 }
 
 /// The exit code is the subject's, so a profiled script is indistinguishable

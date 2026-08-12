@@ -11,19 +11,19 @@ reconstruction.
 ## The tool
 
 ```
-bashprof run [--as-recorded] -- <command…>
-bashprof polyfill
+bashprof [--as-recorded] -- <command…>
 ```
 
-`run` prints the tree and exits with the **subject's** own status, so a
-profiled script is indistinguishable from an unprofiled one. Where the shell
-died inside a measured call the two halves of `Profile::of`'s result go to the
-two streams: the measurements that completed to stdout, what prevented a whole
-profile to stderr. `--as-recorded` prints the tree as recorded instead, unended
-calls included.
+One thing, so no subcommand. It prints the tree and exits with the
+**subject's** own status, so a profiled script is indistinguishable from an
+unprofiled one. Where the shell died inside a measured call the two halves of
+`Profile::of`'s result go to the two streams: the measurements that completed
+to stdout, what prevented a whole profile to stderr. `--as-recorded` prints the
+tree as recorded instead, unended calls included.
 
-`polyfill` prints a no-op `BASHPROF_TIME_CPS`, so a script keeps its call sites
-and still runs without the tool.
+Keeping a script's call sites runnable without the tool is the client's own,
+and `assets/bashprof_polyfill.bash` is what it vendors to do it — see
+[vendoring.md](vendoring.md).
 
 ## The layers are aliases
 

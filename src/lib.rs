@@ -41,7 +41,7 @@ mod render;
 
 use crate::bash::rig::{Failure, Line, Rig, Startup};
 
-pub use instrument::{instrument, POLYFILL};
+pub use instrument::instrument;
 pub use nesting::{nest, Recorded};
 pub use profile::{Profile, Span, Unfinished};
 pub use record::{Call, Id, Record};
