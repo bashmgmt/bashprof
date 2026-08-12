@@ -27,10 +27,6 @@ pub struct Recorded {
 }
 
 impl Recorded {
-    pub fn call(&self) -> &Call {
-        self.record.call()
-    }
-
     /// The calls in this forest the shell died inside, outermost first.
     pub fn unended(forest: &[Recorded]) -> Vec<&Call> {
         forest.iter().flat_map(Recorded::unended_here).collect()
@@ -55,7 +51,8 @@ impl Recorded {
         let mut seen: Vec<&Path> = Vec::new();
 
         for node in forest {
-            let own = node.call().stack.frames().filter_map(|frame| frame.source.missing());
+            let own =
+                node.record.call().stack.frames().filter_map(|frame| frame.source.missing());
 
             for path in own.chain(Recorded::missing(&node.children)) {
                 if !seen.contains(&path) {
@@ -69,7 +66,7 @@ impl Recorded {
     /// The forest as it stands, ended and unended alike.
     pub fn render(forest: &[Recorded]) -> String {
         render::forest(forest, |node: &Recorded| node.children.to_vec(), |node: &Recorded| {
-            let call = node.call();
+            let call = node.record.call();
             let took = match &node.record {
                 Record::Ended(complete) => format!("{} µs", complete.took()),
                 Record::Unended(_) => "NEVER ENDED".to_string(),

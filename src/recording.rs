@@ -13,8 +13,8 @@
 use std::collections::HashMap;
 
 use crate::bash::rig::{field, Doing, Failure, Line, Micros};
-use crate::bash::value::parse_array;
 use crate::bash::stack::Columns;
+use crate::bash::value::parse_array;
 
 use super::record::{Call, Complete, Id, Record};
 

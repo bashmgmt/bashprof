@@ -1,8 +1,7 @@
 //! One tree formatter, for whichever tree is being shown.
 //!
-//! Hylic's shipped [`TreeFormatCfg`] — the same one `resolve::pretty` renders
-//! resolution trees with — driven fused over a forest. The head closure is the
-//! only thing a caller supplies.
+//! Hylic's shipped [`TreeFormatCfg`], driven fused over a forest. The head
+//! closure is the only thing a caller supplies.
 
 use hylic::prelude::{treeish, TreeFormatCfg, FUSED};
 

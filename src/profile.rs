@@ -10,9 +10,7 @@ use std::iter::once;
 
 use either::Either::{Left, Right};
 use hylic::prelude::{treeish, vec_fold, VecFold, VecHeap, FUSED};
-use serde::Serialize;
-
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::nesting::Recorded;
 use super::record::{Call, Complete, Record};
@@ -31,22 +29,13 @@ pub struct Span {
 }
 
 impl Span {
-    pub fn call(&self) -> &Call {
-        &self.complete.call
-    }
-
-    /// BEGIN to END: this span's own work and everything inside it.
-    pub fn inclusive(&self) -> u64 {
-        self.complete.took()
-    }
-
     /// How much of this window no measured child was running for.
     ///
     /// Children do not partition it: two forks of one line run at once, and a
     /// backgrounded one can outlive the call that made it. Their windows are
     /// clipped to this one and merged, so overlap counts once.
     pub fn exclusive(&self) -> u64 {
-        self.inclusive() - self.covered()
+        self.complete.took() - self.covered()
     }
 
     /// How much of this window some child was running for, counted once.
@@ -62,7 +51,7 @@ impl Span {
             .filter(|(from, upto)| from < upto)
             .collect();
 
-        windows.sort();
+        windows.sort_unstable();
         windows
             .iter()
             .fold((0, began), |(covered, filled), &(from, upto)| {
@@ -76,17 +65,12 @@ impl Span {
     }
 
     pub fn child(&self, label: &str) -> Option<&Span> {
-        self.children.iter().find(|span| span.call().label == label)
+        self.children.iter().find(|span| span.complete.call.label == label)
     }
 
     /// This span and everything under it, outermost first.
     pub fn all(&self) -> Vec<&Span> {
         once(self).chain(self.children.iter().flat_map(Span::all)).collect()
-    }
-
-    /// A span states what a run measured, and nothing outside a run has.
-    pub(super) fn of(complete: Complete, children: Vec<Span>) -> Self {
-        Self { complete, children }
     }
 }
 
@@ -102,13 +86,15 @@ impl fmt::Display for Profile {
             &self.roots,
             |span: &Span| span.children.clone(),
             |span: &Span| {
+                let call = &span.complete.call;
+
                 format!(
                     "{} {} µs ({} µs of its own) at {} in pid {}",
-                    span.call().label,
-                    span.inclusive(),
+                    call.label,
+                    span.complete.took(),
                     span.exclusive(),
-                    span.call().stack.at(),
-                    span.call().sent.pid
+                    call.stack.at(),
+                    call.sent.pid
                 )
             },
         ))
@@ -177,7 +163,7 @@ fn reading() -> VecFold<Recorded, Reading> {
     vec_fold(|heap: &VecHeap<Recorded, Reading>| {
         match (&heap.node.record, measured(&heap.childresults)) {
             (Record::Ended(complete), Some(children)) => {
-                Ok(Span::of(complete.clone(), children))
+                Ok(Span { complete: complete.clone(), children })
             }
             _ => Err(salvage(&heap.childresults)),
         }

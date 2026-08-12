@@ -44,7 +44,7 @@ fn node(record: Record, children: Vec<Recorded>) -> Recorded {
 }
 
 fn span(label: &str, began: u64, ended: u64, children: Vec<Span>) -> Span {
-    Span::of(complete(label, began, ended), children)
+    Span { complete: complete(label, began, ended), children }
 }
 
 /// Two children overlapping each other and a third outliving its parent: the
@@ -64,7 +64,7 @@ fn a_spans_own_time_is_what_no_child_was_running_for() {
         ],
     );
 
-    assert_eq!(a.inclusive(), 100);
+    assert_eq!(a.complete.took(), 100);
     assert_eq!(a.exclusive(), 15, "0..10 and 90..95, and nothing else");
 }
 
@@ -89,7 +89,7 @@ fn a_call_that_ended_around_one_that_did_not_is_no_measurement_either() {
 
     assert_eq!(unfinished.unended().len(), 1);
     assert_eq!(
-        unfinished.resolved.roots.iter().map(|s| s.call().label.as_str()).collect::<Vec<_>>(),
+        unfinished.resolved.roots.iter().map(|s| s.complete.call.label.as_str()).collect::<Vec<_>>(),
         ["done"],
         "`outer` knows its own duration but cannot account for it, so it is not a span"
     );
