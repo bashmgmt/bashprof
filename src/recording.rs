@@ -22,9 +22,8 @@ const TAG: &str = "TIME_CPS";
 
 /// One call the run made, and the name its shell said it was made inside of.
 ///
-/// That name is what [`nest`](super::nest) reads, and what the tree it builds
-/// then holds in its own shape — so it stops here rather than riding along on
-/// a node that already says the same thing by where it sits.
+/// That name is what [`nest`](super::nest) reads, and the tree it builds holds
+/// the same fact in its shape, so it stops here.
 pub(super) struct Read {
     pub record: Record,
     pub inside: Option<Id>,
@@ -73,9 +72,8 @@ impl Reading {
         }
     }
 
-    /// A name is given once. Two calls under one name would close each other's
-    /// spans and claim each other's children, so it is refused here rather
-    /// than read as a tree nothing produced.
+    /// A name is given once: two calls under one name would close each
+    /// other's spans and claim each other's children.
     fn begin(&mut self, line: &Line, rest: &[String]) -> Result<(), Failure> {
         let (call, inside) = began(line, rest)?;
 
@@ -141,16 +139,12 @@ fn began(line: &Line, rest: &[String]) -> Result<(Call, Option<Id>), Failure> {
         field(rest, key).ok_or_else(|| reading(format!("a BEGIN with no {key:?}"))).map(str::to_string)
     };
 
-    let mut frames = Columns::of(rest)?.frames()?.into_iter();
-    let at = frames.next().ok_or_else(|| reading("a walk with no frames"))?;
-
     let call = Call {
         id: named(rest)?,
         label: word("label")?,
         pid: line.pid,
         began: line.sent_at,
-        at,
-        outer: frames.collect(),
+        stack: Columns::of(rest)?.frames()?,
     };
 
     Ok((call, Some(word("inside")?).filter(|inside| !inside.is_empty()).map(Id)))

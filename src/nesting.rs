@@ -3,8 +3,7 @@
 //! Each record names the call it was made inside of, so the edges are given
 //! and the shape follows from one index over them: which records name each
 //! call. A [`Treeish`](hylic::graph::Treeish) over that index is the tree, and
-//! a fold materialises it, exactly as `resolve::pipeline::resolution`
-//! materialises a `Resolution`.
+//! a fold materialises it.
 //!
 //! Nothing here asks whether a call ended. Where a call sits does not depend
 //! on how it went.
@@ -56,7 +55,7 @@ impl Recorded {
                 Record::Unended { .. } => "NEVER ENDED".to_string(),
             };
 
-            format!("{} {took} at {} in pid {}", call.label, call.at, call.pid)
+            format!("{} {took} at {} in pid {}", call.label, call.stack.at(), call.pid)
         })
     }
 }
@@ -114,8 +113,8 @@ impl At {
     }
 }
 
-/// Read flat records as the forest their names describe. The names are spent
-/// here: what a node is inside of is where it sits, from now on.
+/// Read flat records as the forest their names describe. Past this point what
+/// a node is inside of is where it sits.
 pub(super) fn nest(read: Vec<Read>) -> Vec<Recorded> {
     let nesting = Arc::new(Nesting::of(read));
     let shape = treeish(At::children);

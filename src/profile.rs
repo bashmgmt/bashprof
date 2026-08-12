@@ -4,9 +4,6 @@
 //! call inside it did. That is a traverse: [`measured`] turns the children's
 //! readings into their spans, or into `None` the moment one of them is not a
 //! measurement. Nothing tracks whether something went wrong; the shape says.
-//!
-//! This is how `resolve::pipeline::outcome` reads a resolution tree of
-//! `Either<Err, Valid>` as an outcome or the paths that prevent one.
 
 use std::fmt;
 use std::iter::once;
@@ -16,7 +13,7 @@ use hylic::prelude::{treeish, vec_fold, VecFold, VecHeap, FUSED};
 use serde::Serialize;
 
 use crate::bash::rig::{Micros, Pid};
-use crate::bash::stack::Frame;
+use crate::bash::stack::Stack;
 
 use super::nesting::Recorded;
 use super::record::{Call, Id, Record};
@@ -25,9 +22,9 @@ use super::render;
 /// One measured call, and the ones made inside it. Every field is a fact: a
 /// call that had not ended would not be here.
 ///
-/// Where the call sits among the others is the tree; what it adds is where it
-/// was made. The rest of the stack it was made on stays on its
-/// [`Call`], which the recorded forest still holds.
+/// Where the call sits among the others is the tree; the stack is not that and
+/// cannot be read off it, since an unmeasured function between two measured
+/// calls is a frame and not a node.
 #[derive(Debug, Clone, Serialize)]
 pub struct Span {
     /// The name the shell gave this call, which is the only thing that tells
@@ -38,7 +35,11 @@ pub struct Span {
     pub pid: Pid,
     pub began: Micros,
     pub ended: Micros,
-    pub at: Frame,
+
+    /// The subject's walk at the moment of the call, from the call site
+    /// outward.
+    pub stack: Stack,
+
     pub children: Vec<Span>,
 }
 
@@ -50,10 +51,9 @@ impl Span {
 
     /// How much of this window no measured child was running for.
     ///
-    /// Children do not partition it. Two forks of one line run at once, and a
-    /// backgrounded one can outlive the call that made it — so their windows
-    /// are clipped to this one and merged, and summing them instead would
-    /// count the overlap twice and claim more than there is.
+    /// Children do not partition it: two forks of one line run at once, and a
+    /// backgrounded one can outlive the call that made it. Their windows are
+    /// clipped to this one and merged, so overlap counts once.
     pub fn exclusive(&self) -> u64 {
         self.inclusive() - self.covered()
     }
@@ -85,8 +85,7 @@ impl Span {
         once(self).chain(self.children.iter().flat_map(Span::all)).collect()
     }
 
-    /// Not public: a span states what a run measured, and nothing outside can
-    /// have measured it.
+    /// A span states what a run measured, and nothing outside a run has.
     pub(super) fn of(call: &Call, ended: Micros, children: Vec<Span>) -> Self {
         Self {
             id: call.id.clone(),
@@ -94,7 +93,7 @@ impl Span {
             pid: call.pid,
             began: call.began,
             ended,
-            at: call.at.clone(),
+            stack: call.stack.clone(),
             children,
         }
     }
@@ -118,7 +117,7 @@ impl fmt::Display for Profile {
                     span.label,
                     span.inclusive(),
                     span.exclusive(),
-                    span.at,
+                    span.stack.at(),
                     span.pid
                 )
             },
@@ -128,9 +127,8 @@ impl fmt::Display for Profile {
 
 /// The forest held calls the shell died inside, so it is not a whole profile.
 ///
-/// The measurements that did complete come with this — they are no less true
-/// for the run having ended badly — and the forest they were read from is the
-/// caller's already, so this borrows it rather than carrying a second account.
+/// The measurements that did complete come with it; the forest they were read
+/// from is the caller's already, and is borrowed.
 #[derive(Debug)]
 pub struct Unfinished<'a> {
     pub resolved: Profile,
@@ -183,8 +181,8 @@ fn salvage(readings: &[Reading]) -> Vec<Span> {
 
 /// A call that ended *around* one that did not is not a measurement either:
 /// its own duration is known, but its exclusive time would count work it
-/// cannot account for. So the rule is the whole subtree or none of it, which
-/// is what pairing the node's own record with [`measured`] says.
+/// cannot account for. The rule is the whole subtree or none of it, which is
+/// what pairing the node's own record with [`measured`] says.
 fn reading() -> VecFold<Recorded, Reading> {
     vec_fold(|heap: &VecHeap<Recorded, Reading>| {
         match (&heap.node.record, measured(&heap.childresults)) {
@@ -197,10 +195,8 @@ fn reading() -> VecFold<Recorded, Reading> {
 }
 
 impl Profile {
-    /// Read a recorded forest as measurements.
-    ///
-    /// Run fused: the tree is small and every node is a handful of moves, so
-    /// there is nothing here a work-stealing pool would help with.
+    /// Read a recorded forest as measurements. Fused: the tree is small and
+    /// every node is a handful of moves.
     pub fn of(forest: &[Recorded]) -> Result<Self, Unfinished<'_>> {
         let fold = reading();
         let shape = treeish(|node: &Recorded| node.children.to_vec());

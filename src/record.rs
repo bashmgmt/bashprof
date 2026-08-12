@@ -5,14 +5,12 @@ use std::fmt;
 use serde::Serialize;
 
 use crate::bash::rig::{Micros, Pid};
-use crate::bash::stack::Frame;
+use crate::bash::stack::Stack;
 
-/// The name a shell gave one of its calls.
+/// The name a shell gave one of its calls: `$BASHPID` and a count only that
+/// shell advances, which is what makes it unique across a run's process tree.
 ///
-/// Opaque here — it is the shell's word, and nothing reads into it. What the
-/// shell puts in it is `$BASHPID` and a count only that shell advances, which
-/// is what makes it unique across a run's process tree; see
-/// `src/bashprof/bashprof.bash` for why neither half can be dropped.
+/// Opaque here — it is the shell's word, and nothing reads into it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 #[serde(transparent)]
 pub struct Id(pub String);
@@ -31,24 +29,17 @@ pub struct Call {
     pub pid: Pid,
     pub began: Micros,
 
-    /// Where the call was made.
-    pub at: Frame,
-
-    /// The frames above that one, outermost last. Nothing places a call by
-    /// these — the shell said where it belongs — so this is what it is: one
-    /// definite stack per node, whatever the tree does with it.
-    pub outer: Vec<Frame>,
+    /// The subject's walk at the moment of the call, from the call site
+    /// outward.
+    pub stack: Stack,
 }
 
 /// A call, and how it went.
 ///
-/// This is what `Either<ParseOrCanonErr, ModAspectCanon>` is to the resolver,
-/// with one difference that shapes everything downstream: which of the two a
-/// record is says nothing about whether it has children. A module that failed
-/// to parse has no knowable dependencies; a call the shell died inside has
-/// perfectly knowable insides, and the calls made in it named it themselves.
-/// Both variants carry the call under one name, so the tag is the only thing
-/// that differs between them in Rust and in JSON alike.
+/// Which of the two a record is says nothing about whether it has children: a
+/// call the shell died inside has knowable insides, and the calls made in it
+/// named it themselves. Both variants carry the call under one name, so the
+/// tag is the only thing that differs between them in Rust and in JSON alike.
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "state", rename_all = "lowercase")]
 pub enum Record {

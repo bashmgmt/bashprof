@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use crate::bash::rig::{Micros, Pid};
-use crate::bash::stack::Frame;
+use crate::bash::stack::{Frame, Stack};
 
 use super::nesting::Recorded;
 use super::profile::{Profile, Span};
@@ -18,8 +18,13 @@ fn call(label: &str, began: u64) -> Call {
         label: label.into(),
         pid: Pid(1),
         began: Micros(began),
-        at: Frame { funcname: "f".into(), source: "/x.bash".into(), lineno: 1, args: None },
-        outer: Vec::new(),
+        stack: Stack::of(vec![Frame {
+            funcname: "f".into(),
+            source: "/x.bash".into(),
+            lineno: 1,
+            args: None,
+        }])
+        .unwrap(),
     }
 }
 

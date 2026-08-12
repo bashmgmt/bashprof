@@ -175,20 +175,23 @@ Nothing else can go wrong in the placement, because nothing else is decided
 there. In particular there is no ambiguity to report: the shell said where the
 call belongs.
 
-## The frames, then
+## The stack a node carries
 
-Nothing places a call by them any more, and they stay. Each record carries the
-subject's whole stack from its own call site upward, so every node has one
-definite site, with one frame of the instrument's per enclosing measurement —
-where that measurement is executing, and nothing else:
+Nothing places a call by the frames — the shell says where it belongs — and
+every node carries them anyway, because **a stack is not the tree and cannot be
+read off it**: an unmeasured function between two measured calls is a frame and
+not a node.
+
+`Call` and `Span` each hold one [`Stack`](stack.md), from the call site
+outward, with one frame of the instrument's per enclosing measurement:
 
 ```
-c   at    f__B
-    outer BASHPROF_TIME_CPS, f__A, BASHPROF_TIME_CPS, main
+inner   mid@build.bash:2  between@build.bash:3  BASHPROF_TIME_CPS  main@build.bash:5
 ```
 
-`Span::at` reports the innermost, which is what tells two calls made from one
-function apart. At one frame per level a walk 100 deep is a 17 kB payload in
+`between` is on that walk and nowhere in the tree. `Stack::at` is the call
+site, which is what tells two calls made from one function apart, and what
+`human` prints. At one frame per level a walk 100 deep is a 17 kB payload in
 five frames — see
 [measurements.md](measurements.md#what-a-function-layer-costs-an-instrument)
 for what the same instrument costs when its layers are functions instead.
