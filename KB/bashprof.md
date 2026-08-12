@@ -32,70 +32,66 @@ passes over what the run heard:
 | pass | | |
 |---|---|---|
 | `rig::shells` | messages → shells | `seq == 0` opens one |
-| `recording` | a shell's messages → flat records | BEGIN opens, END closes the innermost still open |
-| `nesting` | flat records → a forest | one `Treeish` + one `vec_fold` |
+| `recording` | a shell's messages → records, already placed | BEGIN opens, END closes the one it opened |
+| `nesting` | placed records → a forest | one `Treeish` + one `vec_fold` |
 | `profile` | that forest → timings | one `vec_fold` |
 
 The session is `Vec<Line>`; `hear` keeps. Nothing is accumulated as messages
 arrive, because nothing has to be — provenance rides along.
 
-## What places a call
+## The wrapper places the call
 
-Pairing is per **shell**, not per pid, and never crosses one: within a single
-shell the open calls are a stack, since a call either returns or takes the
-shell down. What is left open when a shell's messages run out is a call it died
-inside.
-
-Where a call sits relative to the others is then a fact about two records, and
-it takes both structures a call stands in:
+`BASHPROF_TIME_CPS` sends BEGIN, runs the call, sends END. So within one shell
+the calls **are** a stack, and a BEGIN belongs to whatever that shell had open
+— the same stack the pairing already keeps:
 
 ```rust
-pub fn encloses(&self, inner: &Call) -> bool {
-    self.site_encloses(inner) && self.shell_encloses(inner)
-}
+let inside = match stack.last() {
+    Some(&enclosing) => Some(enclosing),
+    None => forked_into(&call, index, forked_from, opened),
+};
 ```
 
-**The site** — this call's stack is a *strict* suffix of `inner`'s. Strict, so
-no call encloses itself and two made from one line enclose neither.
+Nothing is searched for and nothing can be ambiguous: a shell's open calls are
+a chain, never a set. A shell either returns from a call or dies inside it, so
+what is left open when its messages run out is the latter — and calls made
+inside it are already placed there, which is why an error node has children
+here where the resolver's cannot.
 
-**The shell** — `inner` ran in this call's shell or one forked from it, which
-is `rig::forked_from` walked upward and carried on the record.
+Reconstructing this by comparing frame stacks across every record in the run is
+the mistake to avoid. It widens the candidate set to things the wrapper had
+already excluded, and then needs machinery to exclude them again.
 
-Neither half is enough alone. A fork inherits the function stack, so a call
-measured inside `( … )` reports the frames of the shell that made it — which is
-what lets it nest under the call it belongs to, and why arrival order or a
-per-pid lane would strand it as a second root. But two forks of *one line*
-report the same site as each other, so the stack cannot tell them apart:
+## Where a fork attaches
 
-```bash
-for delay in 0.05 0.01; do
-    ( BASHPROF_TIME_CPS turn f__work "$delay" ) &
-done
+A fork is the one thing the stack does not cover: it inherits the frames but
+begins a stack of its own. A call that opens a fork's stack therefore attaches
+into the shell it was forked from — the innermost call still running there,
+walking up `rig::forked_from` until a shell has one.
+
+The frames pick it, and this is the only place they are compared:
+
+```rust
+call.made_inside(&open.call)     // open's site is a strict suffix of call's
 ```
 
-Both `turn`s are made at that line, both run at once, and a call inside either
-encloses under both by site and by clock. The shell is the only thing left, and
-it decides.
+A shell blocked on a fork has the same call open throughout, so the choice is
+forced. A shell that forked in the *background* may have begun another call
+since — and one begun after the fork is not one the inherited site was ever
+made under, so it does not match and the walk passes it. That is the whole of
+what `&` costs, and it costs it in one `find`.
 
-Where two calls share a site and overlap without being in separate shells —
-two turns of a sequential loop — **when** each ran separates them, which is what
-`Record::running_at` is for.
-
-## A tie is a defect, not a choice
-
-The parent is the deepest enclosing record that was running. Two at that depth
-would be one call made inside two others, which one shell's stack discipline
-rules out; `nest` therefore returns a `Failure` naming both rather than taking
-the first. Nothing in a run can produce it, and a reading that says otherwise
-is wrong about the run — which is worth hearing.
+Shells that never spoke are transparent to all of this: they are not in
+`shells()`, and `__BC__owner` is inherited past them, so the fork chain links
+the shells that have calls to place.
 
 ## Time a span had to itself
 
-A span's children do **not** partition its window. Concurrent forks overlap
-each other, and a backgrounded one can outlive the call that made it. Summing
-their durations and subtracting would count the overlap twice and the part past
-the window at all, and claim more time than the span has — an unsigned
-subtraction that goes negative.
+Placement is settled; the overlap is not. A span's children do **not** partition
+its window: concurrent forks overlap each other, and a backgrounded one can
+outlive the call that made it. Summing their durations and subtracting would
+count the overlap twice and the part past the window at all, and claim more
+time than the span has — an unsigned subtraction that goes negative.
 
 So the children's windows are clipped to the parent's and merged, and a span's
 own time is what none of them covered. For sequential children that is exactly
