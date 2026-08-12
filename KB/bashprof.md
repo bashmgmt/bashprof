@@ -4,33 +4,74 @@
 
 A worked rig that times a tree of CPS calls. The instrument measures nothing
 and infers nothing: the wire stamps every message with the sending shell's
-`$EPOCHREALTIME` and pid, `__bc_stack` appends the frame walk, and the wrapper
-adds the two words that make the tree an observation rather than a
+`$EPOCHREALTIME` and pid, and the instrument adds a walk, a name, and the name
+it was handed — which is what makes the tree an observation rather than a
 reconstruction.
+
+## The spine
+
+The public word is a chain of `with_` steps and a last one that does the work.
+Each step declares what it contributes **in its own frame** and calls the next,
+so everything downstream reads it through dynamic scoping and every fork
+inherits it. That is the same mechanism the parent edge itself travels on — see
+[scoping.md](scoping.md).
 
 ```bash
 BASHPROF_TIME_CPS() {
-    local __BP_label="${1-}"
-    shift || __BC_THROW
-
-    __BP_made=$(( __BP_made + 1 ))
-    local __BP_id="$BASHPID.$__BP_made"
-
-    local -a __BP_begin=(BEGIN id "$__BP_id" inside "${__BP_inside-}" label "$__BP_label")
-    __bc_stack __BP_begin 2
-
-    BC_INSTR say TIME_CPS "${__BP_begin[@]}" || __BC_BAIL
-
-    local __BP_inside="$__BP_id"
-
-    "$@"
-    local __BP_rc=$?
-
-    BC_INSTR say TIME_CPS END id "$__BP_id" || __BC_BAIL
-
-    return "$__BP_rc"
+    __BASHPROF_WITH_STACK 2 __BASHPROF_WITH_UNIQUE_ID __BASHPROF_TIME_NAMED "$@"
 }
 ```
+
+| step | declares | read by |
+|---|---|---|
+| `__BASHPROF_WITH_STACK <spine>` | `__BP_stack` — the call site's walk | the last step, into the BEGIN |
+| `__BASHPROF_WITH_UNIQUE_ID` | `__BP_id` — this call's name | the last step, and its END |
+| `__BASHPROF_TIME_NAMED` | `__BP_inside` — its own name, for what it runs | every call made inside it |
+
+**The order is not free.** The walk has to be taken at the head, where only the
+spine stands between it and the call site; every step placed before it would be
+one more frame to skip. `<spine>` says how many that is — 2, this word's frame
+and the step's own — and `__bc_stack`'s own frame is added inside the step,
+because whose frame that is, is that step's business.
+
+```bash
+__BASHPROF_WITH_STACK() {
+    local __BP_spine="${1-}"
+    shift || __BC_THROW
+
+    local -a __BP_stack=()
+    __bc_stack __BP_stack $(( 1 + __BP_spine + ${__BASHPROF_STACK_SHIFT:-0} ))
+
+    "$@"
+}
+```
+
+## `$__BASHPROF_STACK_SHIFT`
+
+Code that wrapped the public word in a word of its own needs the walk to reach
+past that too. It says so in the frame it is wrapping from, so the value dies
+with that frame:
+
+```bash
+measure_step() {
+    local __BASHPROF_STACK_SHIFT=1
+    BASHPROF_TIME_CPS "$@"
+}
+```
+
+Read through `:-0` because an **unset** name inside `(( ))` is an error under
+`set -u` while an **empty** one is zero — so a subject that never heard of it
+pays one parameter expansion and adds nothing.
+
+The last step clears it directly ahead of the call:
+
+```bash
+declare -- __BASHPROF_STACK_SHIFT=
+"$@"
+```
+
+A shift was for reaching *this* call site. Measured calls made inside this one
+have their own, and would otherwise inherit a shift meant for someone else.
 
 | pass | | |
 |---|---|---|
@@ -98,17 +139,26 @@ call belongs.
 ## The frames, then
 
 Nothing places a call by them any more, and they stay. Each record carries the
-subject's whole stack with exactly two frames dropped — `__bc_stack`'s own and
-the wrapper's — so every node has one definite site, and the wrapper's *other*
-frames remain because that is where the calls above it are executing:
+subject's whole stack from its own call site upward, so every node has one
+definite site, and the spine's frames remain above it because that is where the
+calls above it are executing:
 
 ```
 c   at    f__B
-    outer BASHPROF_TIME_CPS, f__A, BASHPROF_TIME_CPS, main
+    outer __BASHPROF_TIME_NAMED, __BASHPROF_WITH_UNIQUE_ID, __BASHPROF_WITH_STACK,
+          BASHPROF_TIME_CPS, f__A,
+          __BASHPROF_TIME_NAMED, __BASHPROF_WITH_UNIQUE_ID, __BASHPROF_WITH_STACK,
+          BASHPROF_TIME_CPS, main
 ```
 
-`Span::at` reports the innermost of these, which is what tells two calls made
-from one function apart.
+`Span::at` reports the innermost, which is what tells two calls made from one
+function apart.
+
+**That is what the spine costs.** Four frames per enclosing measurement rather
+than one, and every frame repeats the source path in its own column — see
+[measurements.md](measurements.md#a-cps-spine-in-the-payload). Splitting the
+public word into `with_` steps is a choice about which shape the instrument
+should have, paid for in bytes on the wire.
 
 ## Time a span had to itself
 
