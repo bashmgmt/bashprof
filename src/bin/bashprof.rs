@@ -1,18 +1,17 @@
-//! Run a bash command under the profiler and print the tree its measured
-//! calls made.
+//! Run a bash command under the profiler and serialize what its measured
+//! calls recorded.
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
-use mb_resolver::bash::rig::{run, ExitStatus, Failure};
-use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded};
+use mb_resolver::bash::rig::{run, Doing, Failure, Line};
+use mb_resolver::bashprof::{recorded, BashProf, Profile, Unfinished};
 
 #[derive(Parser)]
 #[command(name = "bashprof", about = "Time a tree of calls in a bash program")]
 struct Cli {
-    /// Print the tree as recorded — every call that began, ended or not —
-    /// rather than as timings.
-    #[arg(long)]
-    as_recorded: bool,
+    /// What to write to stdout.
+    #[arg(long, value_enum, default_value_t = Output::Tree)]
+    output: Output,
 
     /// The wrapped command, program included — `bash build.bash`, or
     /// `make test`, whose own shells join too. Everything from the first
@@ -22,14 +21,25 @@ struct Cli {
     argv: Vec<String>,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
+enum Output {
+    /// The measured tree: one JSON array of root spans. A call the shell died
+    /// inside leaves no measurement, so this fails rather than report a tree
+    /// that is quietly missing time.
+    Tree,
+
+    /// The recorded tree: the same array, with every call that began, whether
+    /// or not it ended. An unended one carries `"ended": null`.
+    TreeWithErr,
+
+    /// Every message the run heard, one JSON object per line, before any of it
+    /// is read as calls.
+    Raw,
+}
+
 fn main() {
     let code = match Cli::try_parse() {
-        Ok(cli) => profile(&cli.argv, cli.as_recorded)
-            .map(ExitStatus::shell_code)
-            .unwrap_or_else(|error| {
-                eprintln!("bashprof: {error}");
-                1
-            }),
+        Ok(cli) => produce(&cli),
         Err(complaint) => {
             let _ = complaint.print();
             2
@@ -39,31 +49,61 @@ fn main() {
     std::process::exit(code);
 }
 
-/// The exit code is the subject's, so a profiled script is indistinguishable
-/// from an unprofiled one.
-///
-/// A run that died inside a measured call still measured everything that
-/// completed, and those measurements are printed: a tool reporting what it has
-/// is the caller `Profile::of` splits its result for.
-fn profile(argv: &[String], as_recorded: bool) -> Result<ExitStatus, Failure> {
-    let ran = run(&BashProf, argv)?;
-    let forest = recorded(&ran.session)?;
+/// The subject's own status when it failed, so a profiled script is
+/// indistinguishable from an unprofiled one. Where the subject succeeded and
+/// bashprof could not produce what was asked for, the failure is bashprof's
+/// and so is the status.
+fn produce(cli: &Cli) -> i32 {
+    match run(&BashProf, &cli.argv) {
+        Err(why) => {
+            eprintln!("bashprof: {why}");
+            1
+        }
+        Ok(ran) => {
+            let wrote = written(cli.output, &ran.session)
+                .and_then(|text| {
+                    println!("{text}");
+                    ran.failed.map_or(Ok(()), Err)
+                })
+                .map_err(|why| eprintln!("bashprof: {why}"));
 
-    if as_recorded {
-        println!("{}", Recorded::render(&forest));
-    } else {
-        match Profile::of(&forest) {
-            Ok(profile) => println!("{profile}"),
-            Err(unfinished) => {
-                println!("{}", unfinished.resolved);
-                eprintln!("bashprof: {unfinished}");
+            match (ran.subject.shell_code(), wrote) {
+                (0, Err(())) => 1,
+                (code, _) => code,
             }
         }
     }
+}
 
-    if let Some(why) = ran.failed {
-        eprintln!("bashprof: {why}");
+/// What goes to stdout, or what stopped it being knowable.
+///
+/// Only `Tree` refuses an unfinished run: it is the one output whose every
+/// entry claims a duration, and a call the shell died inside has none. The
+/// other two report what the run said, which is defined however it ended.
+fn written(output: Output, heard: &[Line]) -> Result<String, Failure> {
+    match output {
+        Output::Raw => heard
+            .iter()
+            .map(|line| {
+                let at = || format!("a message from pid {}", line.pid);
+                serde_json::to_string(line).doing(at)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|lines| lines.join("\n")),
+
+        Output::TreeWithErr => json(&recorded(heard)?),
+
+        Output::Tree => {
+            let forest = recorded(heard)?;
+            let reading = |unfinished: Unfinished<'_>| {
+                Failure::new("reading the run as measurements", unfinished.to_string())
+            };
+
+            json(&Profile::of(&forest).map_err(reading)?)
+        }
     }
+}
 
-    Ok(ran.subject)
+fn json<T: serde::Serialize>(what: &T) -> Result<String, Failure> {
+    serde_json::to_string_pretty(what).doing(|| "serializing the tree".to_string())
 }

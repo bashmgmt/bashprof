@@ -13,6 +13,7 @@ use std::iter::once;
 
 use either::Either::{Left, Right};
 use hylic::prelude::{treeish, vec_fold, VecFold, VecHeap, FUSED};
+use serde::{Serialize, Serializer};
 
 use crate::bash::rig::{Micros, Pid};
 use crate::bash::stack::Frame;
@@ -99,8 +100,42 @@ impl Span {
     }
 }
 
+/// One span as JSON. Both durations are computed here rather than held: each
+/// is a function of the window and the children, and `exclusive` is one a
+/// reader could not recover without repeating [`Span::covered`].
+#[derive(Serialize)]
+struct AsJson<'a> {
+    id: &'a Id,
+    label: &'a str,
+    pid: Pid,
+    began: Micros,
+    ended: Micros,
+    inclusive: u64,
+    exclusive: u64,
+    at: &'a Frame,
+    children: &'a [Span],
+}
+
+impl Serialize for Span {
+    fn serialize<S: Serializer>(&self, into: S) -> Result<S::Ok, S::Error> {
+        AsJson {
+            id: &self.id,
+            label: &self.label,
+            pid: self.pid,
+            began: self.began,
+            ended: self.ended,
+            inclusive: self.inclusive(),
+            exclusive: self.exclusive(),
+            at: &self.at,
+            children: &self.children,
+        }
+        .serialize(into)
+    }
+}
+
 /// The measurements a recorded forest yields, outermost first.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(transparent)]
 pub struct Profile {
     pub roots: Vec<Span>,
 }

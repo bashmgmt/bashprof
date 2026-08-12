@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use serde::Serialize;
+
 use crate::bash::rig::{Micros, Pid};
 use crate::bash::stack::Frame;
 
@@ -10,8 +12,9 @@ use crate::bash::stack::Frame;
 /// Opaque here — it is the shell's word, and nothing reads into it. What the
 /// shell puts in it is `$BASHPID` and a count only that shell advances, which
 /// is what makes it unique across a run's process tree; see
-/// `tests/examples/bash/bashprof.bash` for why neither half can be dropped.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+/// `src/bashprof/bashprof.bash` for why neither half can be dropped.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[serde(transparent)]
 pub struct Id(pub String);
 
 impl fmt::Display for Id {
@@ -21,7 +24,7 @@ impl fmt::Display for Id {
 }
 
 /// A measured call, as its BEGIN reported it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Call {
     pub id: Id,
 

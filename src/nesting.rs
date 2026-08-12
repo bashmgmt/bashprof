@@ -13,6 +13,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use hylic::prelude::{treeish, vec_fold, VecHeap, FUSED};
+use serde::{Serialize, Serializer};
+
+use crate::bash::rig::Micros;
 
 use super::record::{Call, Id, Record};
 use super::render;
@@ -22,6 +25,28 @@ use super::render;
 pub struct Recorded {
     pub record: Record,
     pub children: Arc<[Recorded]>,
+}
+
+/// One node as JSON: the call flat, and `ended` present exactly where the
+/// shell reported an end. The enum is the shape in Rust; the nullable field is
+/// the same fact for a reader who has to walk the tree either way.
+#[derive(Serialize)]
+struct AsJson<'a> {
+    #[serde(flatten)]
+    call: &'a Call,
+    ended: Option<Micros>,
+    children: &'a [Recorded],
+}
+
+impl Serialize for Recorded {
+    fn serialize<S: Serializer>(&self, into: S) -> Result<S::Ok, S::Error> {
+        let ended = match &self.record {
+            Record::Ended { ended, .. } => Some(*ended),
+            Record::Unended(_) => None,
+        };
+
+        AsJson { call: self.call(), ended, children: &self.children }.serialize(into)
+    }
 }
 
 impl Recorded {

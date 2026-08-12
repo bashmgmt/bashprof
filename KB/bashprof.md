@@ -11,15 +11,43 @@ reconstruction.
 ## The tool
 
 ```
-bashprof [--as-recorded] -- <command…>
+bashprof [--output tree|tree-with-err|raw] -- <command…>
 ```
 
-One thing, so no subcommand. It prints the tree and exits with the
-**subject's** own status, so a profiled script is indistinguishable from an
-unprofiled one. Where the shell died inside a measured call the two halves of
-`Profile::of`'s result go to the two streams: the measurements that completed
-to stdout, what prevented a whole profile to stderr. `--as-recorded` prints the
-tree as recorded instead, unended calls included.
+One thing, so no subcommand, and one flag, which chooses **how far the run is
+read** before it is serialized:
+
+| `--output` | stdout | refuses |
+|---|---|---|
+| `tree` (default) | `Profile` — a JSON array of root spans, each with `inclusive` and `exclusive` | a run with a call the shell died inside |
+| `tree-with-err` | `Vec<Recorded>` — the same array with every call that began; an unended one carries `"ended": null` | nothing the reading can express |
+| `raw` | every `Line` the run heard, one JSON object per line | nothing |
+
+Only `tree` refuses, and only for that one reason: every entry of it claims a
+duration, and a call that never ended has none. Everything the three share —
+a message the recording refuses, a transport that broke — fails in all of them.
+
+The durations on a span are computed at serialization rather than held, so
+nothing can disagree with the window and the children it is a function of.
+`exclusive` in particular is not recoverable downstream without repeating the
+clip-and-merge described below.
+
+### The exit code
+
+The **subject's own** wherever the subject failed, so a profiled script is
+indistinguishable from an unprofiled one. Where the subject succeeded and
+bashprof could not produce what was asked for, the failure is bashprof's and so
+is the status: 1, with the reason on stderr.
+
+### stdout is shared
+
+The subject inherits bashprof's stdout, so a subject that prints interleaves
+its own output with the serialization. Piping the result into a JSON reader
+means giving the subject somewhere else to write — `bashprof -- bash -c 'build
+>&2'` — or reading `--output raw` from a subject that is quiet.
+
+The text renderings that `Profile` and `Recorded::render` produce stay in the
+library, for a caller assembling a report of its own.
 
 Keeping a script's call sites runnable without the tool is the client's own,
 and `assets/bashprof_polyfill.bash` is what it vendors to do it — see
