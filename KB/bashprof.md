@@ -1,12 +1,29 @@
 # A call tree that travels
 
-`tests/examples/bashprof/`, `tests/examples/bash/bashprof.bash`
+`src/bashprof/`, `src/bin/bashprof.rs`
 
 A worked rig that times a tree of CPS calls. The instrument measures nothing
 and infers nothing: the wire stamps every message with the sending shell's
 `$EPOCHREALTIME` and pid, and the instrument adds a walk, a name, and the name
 it was handed — which is what makes the tree an observation rather than a
 reconstruction.
+
+## The tool
+
+```
+bashprof run [--as-recorded] -- <command…>
+bashprof polyfill
+```
+
+`run` prints the tree and exits with the **subject's** own status, so a
+profiled script is indistinguishable from an unprofiled one. Where the shell
+died inside a measured call the two halves of `Profile::of`'s result go to the
+two streams: the measurements that completed to stdout, what prevented a whole
+profile to stderr. `--as-recorded` prints the tree as recorded instead, unended
+calls included.
+
+`polyfill` prints a no-op `BASHPROF_TIME_CPS`, so a script keeps its call sites
+and still runs without the tool.
 
 ## The layers are aliases
 
@@ -64,30 +81,9 @@ declare -- __BASHPROF_STACK_SHIFT=
 A shift was for reaching *this* call site. Measured calls made inside this one
 have their own, and would otherwise inherit a shift meant for someone else.
 
-| pass | | |
-|---|---|---|
-| `recording` | messages → flat records | one pass, one map from name to call |
-| `nesting` | records → a forest | one index, then `Treeish` + `vec_fold` |
-| `profile` | that forest → timings | one `vec_fold` |
-
-The session is `Vec<Line>`; `hear` keeps. Nothing is grouped by shell, nothing
-is paired by position, and nothing depends on the order messages arrived in.
-
-## The hand-off is the whole mechanism
-
-`local __BP_inside="$__BP_id"` sits **after** the BEGIN is sent and **before**
-the call is run. That ordering is the design:
-
-- reading `${__BP_inside-}` for the payload happens while the name in scope is
-  still the caller's, so a call reports the call it was made inside of;
-- declaring it `local` puts the new name in this frame, so everything `"$@"`
-  reaches reads it by dynamic scoping — see [scoping.md](scoping.md);
-- **a fork inherits it** along with the rest of the shell image, so the edge
-  crosses a process boundary with nothing to reconstruct.
-
-Unmeasured code between two measured calls is transparent to this: it neither
-sets nor shadows the name, so a call made ten frames below the last measured
-one still names that one.
+Unmeasured code between two measured calls is transparent to all of this: it
+neither sets nor shadows either name, so a call made ten frames below the last
+measured one still names that one, and still reports its own call site.
 
 ## Why the name is `$BASHPID` and a count
 
@@ -112,6 +108,17 @@ What remains is pid reuse inside one run, which would take the OS cycling the
 whole pid space in the seconds a profiled run lasts. That is not guarded
 against; it is **detected**, because a second call under one name is refused
 where the names are read.
+
+## The reading
+
+| pass | | |
+|---|---|---|
+| `recording` | messages → flat records | one pass, one map from name to call |
+| `nesting` | records → a forest | one index, then `Treeish` + `vec_fold` |
+| `profile` | that forest → timings | one `vec_fold` |
+
+The session is `Vec<Line>`; `hear` keeps. Nothing is grouped by shell, nothing
+is paired by position, and nothing depends on the order messages arrived in.
 
 ## What the reading owes
 
