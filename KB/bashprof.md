@@ -8,43 +8,34 @@ and infers nothing: the wire stamps every message with the sending shell's
 it was handed — which is what makes the tree an observation rather than a
 reconstruction.
 
-## The spine
+## The layers are aliases
 
-The public word is a chain of `with_` steps and a last one that does the work.
-Each step declares what it contributes **in its own frame** and calls the next,
-so everything downstream reads it through dynamic scoping and every fork
-inherits it. That is the same mechanism the parent edge itself travels on — see
-[scoping.md](scoping.md).
+A call carries three declarations, and each is a layer of its own. They are
+**aliases, not functions**: a function would be a frame — one the walk has to
+skip, one every call measured below it carries in its own payload, and one more
+call per measurement. An alias is the same text in the same frame, so the
+layers separate for a reader and cost nothing. What that saves is measured in
+[measurements.md](measurements.md#what-a-function-layer-costs-an-instrument).
 
-```bash
-BASHPROF_TIME_CPS() {
-    __BASHPROF_WITH_STACK 2 __BASHPROF_WITH_UNIQUE_ID __BASHPROF_TIME_NAMED "$@"
-}
-```
-
-| step | declares | read by |
+| layer | declares | read by |
 |---|---|---|
-| `__BASHPROF_WITH_STACK <spine>` | `__BP_stack` — the call site's walk | the last step, into the BEGIN |
-| `__BASHPROF_WITH_UNIQUE_ID` | `__BP_id` — this call's name | the last step, and its END |
-| `__BASHPROF_TIME_NAMED` | `__BP_inside` — its own name, for what it runs | every call made inside it |
+| `__BASHPROF_TAKE_STACK` | `__BP_stack` — the call site's walk | the BEGIN |
+| `__BASHPROF_TAKE_NAME` | `__BP_id` — this call's name | the BEGIN, and the END |
+| `__BASHPROF_HAND_ON` | `__BP_inside` — its own name, for what it runs | every call made inside it |
 
-**The order is not free.** The walk has to be taken at the head, where only the
-spine stands between it and the call site; every step placed before it would be
-one more frame to skip. `<spine>` says how many that is — 2, this word's frame
-and the step's own — and `__bc_stack`'s own frame is added inside the step,
-because whose frame that is, is that step's business.
+Every one of them declares in the frame of the word the subject called, which
+is what puts it where the rest of that word and everything it runs will read
+it — and what a fork inherits. See [scoping.md](scoping.md).
 
 ```bash
-__BASHPROF_WITH_STACK() {
-    local __BP_spine="${1-}"
-    shift || __BC_THROW
-
+alias __BASHPROF_TAKE_STACK='
     local -a __BP_stack=()
-    __bc_stack __BP_stack $(( 1 + __BP_spine + ${__BASHPROF_STACK_SHIFT:-0} ))
-
-    "$@"
-}
+    __bc_stack __BP_stack $(( 2 + ${__BASHPROF_STACK_SHIFT:-0} ))'
 ```
+
+The 2 is `__bc_stack`'s own frame and the frame the alias expands into, so the
+walk points at the subject rather than at the instrument. It holds wherever the
+alias is used, as long as it is used in the body of the word the subject calls.
 
 ## `$__BASHPROF_STACK_SHIFT`
 
@@ -63,11 +54,11 @@ Read through `:-0` because an **unset** name inside `(( ))` is an error under
 `set -u` while an **empty** one is zero — so a subject that never heard of it
 pays one parameter expansion and adds nothing.
 
-The last step clears it directly ahead of the call:
+`__BASHPROF_HAND_ON` clears it, in the same breath as handing the name down:
 
 ```bash
+local __BP_inside="$__BP_id"
 declare -- __BASHPROF_STACK_SHIFT=
-"$@"
 ```
 
 A shift was for reaching *this* call site. Measured calls made inside this one
@@ -140,25 +131,19 @@ call belongs.
 
 Nothing places a call by them any more, and they stay. Each record carries the
 subject's whole stack from its own call site upward, so every node has one
-definite site, and the spine's frames remain above it because that is where the
-calls above it are executing:
+definite site, with one frame of the instrument's per enclosing measurement —
+where that measurement is executing, and nothing else:
 
 ```
 c   at    f__B
-    outer __BASHPROF_TIME_NAMED, __BASHPROF_WITH_UNIQUE_ID, __BASHPROF_WITH_STACK,
-          BASHPROF_TIME_CPS, f__A,
-          __BASHPROF_TIME_NAMED, __BASHPROF_WITH_UNIQUE_ID, __BASHPROF_WITH_STACK,
-          BASHPROF_TIME_CPS, main
+    outer BASHPROF_TIME_CPS, f__A, BASHPROF_TIME_CPS, main
 ```
 
 `Span::at` reports the innermost, which is what tells two calls made from one
-function apart.
-
-**That is what the spine costs.** Four frames per enclosing measurement rather
-than one, and every frame repeats the source path in its own column — see
-[measurements.md](measurements.md#a-cps-spine-in-the-payload). Splitting the
-public word into `with_` steps is a choice about which shape the instrument
-should have, paid for in bytes on the wire.
+function apart. At one frame per level a walk 100 deep is a 17 kB payload in
+five frames — see
+[measurements.md](measurements.md#what-a-function-layer-costs-an-instrument)
+for what the same instrument costs when its layers are functions instead.
 
 ## Time a span had to itself
 
