@@ -13,40 +13,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use hylic::prelude::{treeish, vec_fold, VecHeap, FUSED};
-use serde::{Serialize, Serializer};
-
-use crate::bash::rig::Micros;
+use serde::Serialize;
 
 use super::record::{Call, Id, Record};
 use super::render;
 
 /// A call, and everything called inside it.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Recorded {
-    pub record: Record,
-    pub children: Arc<[Recorded]>,
-}
-
-/// One node as JSON: the call flat, and `ended` present exactly where the
-/// shell reported an end. The enum is the shape in Rust; the nullable field is
-/// the same fact for a reader who has to walk the tree either way.
-#[derive(Serialize)]
-struct AsJson<'a> {
     #[serde(flatten)]
-    call: &'a Call,
-    ended: Option<Micros>,
-    children: &'a [Recorded],
-}
+    pub record: Record,
 
-impl Serialize for Recorded {
-    fn serialize<S: Serializer>(&self, into: S) -> Result<S::Ok, S::Error> {
-        let ended = match &self.record {
-            Record::Ended { ended, .. } => Some(*ended),
-            Record::Unended(_) => None,
-        };
-
-        AsJson { call: self.call(), ended, children: &self.children }.serialize(into)
-    }
+    pub children: Arc<[Recorded]>,
 }
 
 impl Recorded {
@@ -61,7 +39,7 @@ impl Recorded {
 
     fn unended_here(&self) -> Vec<&Call> {
         let own = match &self.record {
-            Record::Unended(call) => Some(call),
+            Record::Unended { call } => Some(call),
             Record::Ended { .. } => None,
         };
 
@@ -74,7 +52,7 @@ impl Recorded {
             let call = node.call();
             let took = match &node.record {
                 Record::Ended { ended, .. } => format!("{} µs", ended.0 - call.began.0),
-                Record::Unended(_) => "NEVER ENDED".to_string(),
+                Record::Unended { .. } => "NEVER ENDED".to_string(),
             };
 
             format!("{} {took} at {} in pid {}", call.label, call.at, call.pid)

@@ -52,10 +52,13 @@ pub struct Call {
 /// record is says nothing about whether it has children. A module that failed
 /// to parse has no knowable dependencies; a call the shell died inside has
 /// perfectly knowable insides, and the calls made in it named it themselves.
-#[derive(Debug, Clone)]
+/// Both variants carry the call under one name, so the tag is the only thing
+/// that differs between them in Rust and in JSON alike.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "state", rename_all = "lowercase")]
 pub enum Record {
     /// The shell died inside this call.
-    Unended(Call),
+    Unended { call: Call },
 
     Ended { call: Call, ended: Micros },
 }
@@ -63,8 +66,7 @@ pub enum Record {
 impl Record {
     pub fn call(&self) -> &Call {
         match self {
-            Self::Unended(call) => call,
-            Self::Ended { call, .. } => call,
+            Self::Unended { call } | Self::Ended { call, .. } => call,
         }
     }
 }

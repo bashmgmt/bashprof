@@ -1,5 +1,7 @@
-//! Run a bash command under the profiler and serialize what its measured
-//! calls recorded.
+//! Run a bash command under the profiler and write what its measured calls
+//! recorded.
+
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, ValueEnum};
 
@@ -9,7 +11,12 @@ use mb_resolver::bashprof::{recorded, BashProf, Profile, Unfinished};
 #[derive(Parser)]
 #[command(name = "bashprof", about = "Time a tree of calls in a bash program")]
 struct Cli {
-    /// What to write to stdout.
+    /// Where the reading goes. The subject owns both streams, so nothing of
+    /// bashprof's is written to them but its own failures.
+    #[arg(long)]
+    into: PathBuf,
+
+    /// How far the run is read before it is written.
     #[arg(long, value_enum, default_value_t = Output::Tree)]
     output: Output,
 
@@ -23,13 +30,13 @@ struct Cli {
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
 enum Output {
-    /// The measured tree: one JSON array of root spans. A call the shell died
-    /// inside leaves no measurement, so this fails rather than report a tree
+    /// The measured tree: a JSON array of root spans. A call the shell died
+    /// inside leaves no measurement, so this refuses rather than write a tree
     /// that is quietly missing time.
     Tree,
 
-    /// The recorded tree: the same array, with every call that began, whether
-    /// or not it ended. An unended one carries `"ended": null`.
+    /// The recorded tree: the same array with every call that began, each
+    /// tagged `"state": "ended"` or `"state": "unended"`.
     TreeWithErr,
 
     /// Every message the run heard, one JSON object per line, before any of it
@@ -49,11 +56,19 @@ fn main() {
     std::process::exit(code);
 }
 
-/// The subject's own status when it failed, so a profiled script is
-/// indistinguishable from an unprofiled one. Where the subject succeeded and
-/// bashprof could not produce what was asked for, the failure is bashprof's
+/// The subject's own status wherever the subject failed, so a profiled script
+/// is indistinguishable from an unprofiled one. Where the subject succeeded
+/// and bashprof could not write what was asked for, the failure is bashprof's
 /// and so is the status.
 fn produce(cli: &Cli) -> i32 {
+    // Truncated before the subject starts, so an unwritable path is known
+    // straight away and a run that reads as nothing leaves nothing earlier
+    // standing in for its reading.
+    if let Err(why) = write(&cli.into, String::new()) {
+        eprintln!("bashprof: {why}");
+        return 1;
+    }
+
     match run(&BashProf, &cli.argv) {
         Err(why) => {
             eprintln!("bashprof: {why}");
@@ -61,10 +76,8 @@ fn produce(cli: &Cli) -> i32 {
         }
         Ok(ran) => {
             let wrote = written(cli.output, &ran.session)
-                .and_then(|text| {
-                    println!("{text}");
-                    ran.failed.map_or(Ok(()), Err)
-                })
+                .and_then(|text| write(&cli.into, text + "\n"))
+                .and_then(|()| ran.failed.map_or(Ok(()), Err))
                 .map_err(|why| eprintln!("bashprof: {why}"));
 
             match (ran.subject.shell_code(), wrote) {
@@ -75,9 +88,13 @@ fn produce(cli: &Cli) -> i32 {
     }
 }
 
-/// What goes to stdout, or what stopped it being knowable.
+fn write(into: &Path, text: String) -> Result<(), Failure> {
+    std::fs::write(into, text).doing(|| format!("writing {}", into.display()))
+}
+
+/// What goes into the file, or what stopped it being knowable.
 ///
-/// Only `Tree` refuses an unfinished run: it is the one output whose every
+/// Only `Tree` refuses an unfinished run: it is the one reading whose every
 /// entry claims a duration, and a call the shell died inside has none. The
 /// other two report what the run said, which is defined however it ended.
 fn written(output: Output, heard: &[Line]) -> Result<String, Failure> {

@@ -13,7 +13,7 @@ use std::iter::once;
 
 use either::Either::{Left, Right};
 use hylic::prelude::{treeish, vec_fold, VecFold, VecHeap, FUSED};
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use crate::bash::rig::{Micros, Pid};
 use crate::bash::stack::Frame;
@@ -28,7 +28,7 @@ use super::render;
 /// Where the call sits among the others is the tree; what it adds is where it
 /// was made. The rest of the stack it was made on stays on its
 /// [`Call`], which the recorded forest still holds.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Span {
     /// The name the shell gave this call, which is the only thing that tells
     /// two measurements of one line apart.
@@ -97,39 +97,6 @@ impl Span {
             at: call.at.clone(),
             children,
         }
-    }
-}
-
-/// One span as JSON. Both durations are computed here rather than held: each
-/// is a function of the window and the children, and `exclusive` is one a
-/// reader could not recover without repeating [`Span::covered`].
-#[derive(Serialize)]
-struct AsJson<'a> {
-    id: &'a Id,
-    label: &'a str,
-    pid: Pid,
-    began: Micros,
-    ended: Micros,
-    inclusive: u64,
-    exclusive: u64,
-    at: &'a Frame,
-    children: &'a [Span],
-}
-
-impl Serialize for Span {
-    fn serialize<S: Serializer>(&self, into: S) -> Result<S::Ok, S::Error> {
-        AsJson {
-            id: &self.id,
-            label: &self.label,
-            pid: self.pid,
-            began: self.began,
-            ended: self.ended,
-            inclusive: self.inclusive(),
-            exclusive: self.exclusive(),
-            at: &self.at,
-            children: &self.children,
-        }
-        .serialize(into)
     }
 }
 

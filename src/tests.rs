@@ -66,7 +66,7 @@ fn a_call_that_ended_around_one_that_did_not_is_no_measurement_either() {
         Record::Ended { call: call("outer", 0), ended: Micros(100) },
         vec![
             node(Record::Ended { call: call("done", 10), ended: Micros(20) }, Vec::new()),
-            node(Record::Unended(call("open", 30)), Vec::new()),
+            node(Record::Unended { call: call("open", 30) }, Vec::new()),
         ],
     )];
 

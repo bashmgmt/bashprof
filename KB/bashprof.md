@@ -11,40 +11,43 @@ reconstruction.
 ## The tool
 
 ```
-bashprof [--output tree|tree-with-err|raw] -- <command…>
+bashprof --into FILE [--output tree|tree-with-err|raw] -- <command…>
 ```
 
-One thing, so no subcommand, and one flag, which chooses **how far the run is
-read** before it is serialized:
+`--output` chooses **how far the run is read** before it is written:
 
-| `--output` | stdout | refuses |
+| `--output` | the file holds | refuses |
 |---|---|---|
-| `tree` (default) | `Profile` — a JSON array of root spans, each with `inclusive` and `exclusive` | a run with a call the shell died inside |
-| `tree-with-err` | `Vec<Recorded>` — the same array with every call that began; an unended one carries `"ended": null` | nothing the reading can express |
+| `tree` (default) | `Profile` — a JSON array of root spans | a run with a call the shell died inside |
+| `tree-with-err` | `Vec<Recorded>` — every call that began, each tagged `"state": "ended"` or `"unended"` | nothing the reading can express |
 | `raw` | every `Line` the run heard, one JSON object per line | nothing |
 
 Only `tree` refuses, and only for that one reason: every entry of it claims a
-duration, and a call that never ended has none. Everything the three share —
-a message the recording refuses, a transport that broke — fails in all of them.
+duration, and a call that never ended has none. Everything the three share — a
+message the recording refuses, a transport that broke — fails in all of them.
 
-The durations on a span are computed at serialization rather than held, so
-nothing can disagree with the window and the children it is a function of.
-`exclusive` in particular is not recoverable downstream without repeating the
-clip-and-merge described below.
+Every shape is a derived `Serialize` over the type named in that row; the JSON
+is the struct, and a method is not a field. `Span::inclusive` and
+`Span::exclusive` are therefore not in it — `began` and `ended` are, and what
+`exclusive` does to the children is described under
+[time a span had to itself](#time-a-span-had-to-itself).
+
+### The subject owns both streams
+
+Nothing of bashprof's is written to stdout or stderr but its own failures, so a
+profiled run pipes exactly as an unprofiled one does. That is what `--into`
+is for, and it is the only way out. `bashcap run --into` is the same rule.
+
+The file is truncated before the subject starts, so an unwritable path is known
+straight away and a run that reads as nothing leaves nothing earlier standing in
+for its reading.
 
 ### The exit code
 
 The **subject's own** wherever the subject failed, so a profiled script is
 indistinguishable from an unprofiled one. Where the subject succeeded and
-bashprof could not produce what was asked for, the failure is bashprof's and so
+bashprof could not write what was asked for, the failure is bashprof's and so
 is the status: 1, with the reason on stderr.
-
-### stdout is shared
-
-The subject inherits bashprof's stdout, so a subject that prints interleaves
-its own output with the serialization. Piping the result into a JSON reader
-means giving the subject somewhere else to write — `bashprof -- bash -c 'build
->&2'` — or reading `--output raw` from a subject that is quiet.
 
 The text renderings that `Profile` and `Recorded::render` produce stay in the
 library, for a caller assembling a report of its own.

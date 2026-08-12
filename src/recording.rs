@@ -106,7 +106,7 @@ impl Reading {
             .into_iter()
             .map(|Open { call, ended }| match ended {
                 Some(ended) => Record::Ended { call, ended },
-                None => Record::Unended(call),
+                None => Record::Unended { call },
             })
             .collect();
 
