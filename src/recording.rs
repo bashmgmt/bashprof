@@ -12,10 +12,11 @@
 
 use std::collections::HashMap;
 
-use crate::bash::rig::{field, Failure, Line, Micros};
+use crate::bash::rig::{field, Doing, Failure, Line, Micros};
+use crate::bash::value::parse_array;
 use crate::bash::stack::Columns;
 
-use super::record::{Call, Id, Record};
+use super::record::{Call, Complete, Id, Record};
 
 /// The word this instrument's messages begin with.
 const TAG: &str = "TIME_CPS";
@@ -40,12 +41,18 @@ pub(super) fn records(heard: &[Line]) -> Result<Vec<Read>, Failure> {
     reading.settled()
 }
 
+/// What an END carries back.
+struct Closed {
+    ended_at: Micros,
+    status: u8,
+}
+
 /// A call while the run is still being read. It gains an end when its END
 /// arrives, and a shell that dies inside it never sends one.
 struct Open {
     call: Call,
     inside: Option<Id>,
-    ended: Option<Micros>,
+    closed: Option<Closed>,
 }
 
 #[derive(Default)]
@@ -67,7 +74,7 @@ impl Reading {
 
         match kind.as_str() {
             "BEGIN" => self.begin(line, rest),
-            "END" => self.end(named(rest)?, line.sent_at),
+            "END" => self.end(rest, line.sent.sent_at),
             other => Err(reading(format!("unknown kind {other:?}"))),
         }
     }
@@ -81,19 +88,26 @@ impl Reading {
             return Err(reading(format!("a second call named {}", call.id)));
         }
 
-        self.opened.push(Open { call, inside, ended: None });
+        self.opened.push(Open { call, inside, closed: None });
         Ok(())
     }
 
-    fn end(&mut self, id: Id, ended: Micros) -> Result<(), Failure> {
+    fn end(&mut self, rest: &[String], ended_at: Micros) -> Result<(), Failure> {
+        let id = named(rest)?;
+        let status = field(rest, "status")
+            .ok_or_else(|| reading(format!("an END for {id} with no status")))?;
+        let status = status
+            .parse()
+            .map_err(|_| reading(format!("an END for {id} with status {status:?}")))?;
+
         let unknown = || reading(format!("an END for {id}, which never began"));
         let open = &mut self.opened[*self.at.get(&id).ok_or_else(unknown)?];
 
-        if open.ended.is_some() {
+        if open.closed.is_some() {
             return Err(reading(format!("a second END for {id}")));
         }
 
-        open.ended = Some(ended);
+        open.closed = Some(Closed { ended_at, status });
         Ok(())
     }
 
@@ -113,16 +127,19 @@ impl Reading {
 
         let mut records: Vec<Read> = opened
             .into_iter()
-            .map(|Open { call, inside, ended }| Read {
-                record: match ended {
-                    Some(ended) => Record::Ended { call, ended },
-                    None => Record::Unended { call },
+            .map(|Open { call, inside, closed }| Read {
+                record: match closed {
+                    Some(Closed { ended_at, status }) => {
+                        Record::Ended(Complete { call, ended_at, status })
+                    }
+                    None => Record::Unended(call),
                 },
                 inside,
             })
             .collect();
 
-        records.sort_by_key(|read| (read.record.call().began, read.record.call().pid.0));
+        records
+            .sort_by_key(|read| (read.record.call().sent.sent_at, read.record.call().sent.pid.0));
         Ok(records)
     }
 }
@@ -142,9 +159,9 @@ fn began(line: &Line, rest: &[String]) -> Result<(Call, Option<Id>), Failure> {
     let call = Call {
         id: named(rest)?,
         label: word("label")?,
-        pid: line.pid,
-        began: line.sent_at,
+        argv: parse_array(&word("argv")?).doing(|| "reading a BEGIN's argv".to_string())?,
         stack: Columns::of(rest)?.frames()?,
+        sent: line.sent.clone(),
     };
 
     Ok((call, Some(word("inside")?).filter(|inside| !inside.is_empty()).map(Id)))

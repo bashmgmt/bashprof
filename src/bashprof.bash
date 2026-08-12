@@ -30,6 +30,9 @@
 # Read through `:-0` because an unset name inside `(( ))` is an error under
 # `set -u`, and an empty one is zero.
 alias __BASHPROF_TAKE_STACK='
+    local __BP_had_ifs=1; [[ -v IFS ]] || __BP_had_ifs=
+    local __BP_ifs="${IFS-}"
+    local IFS=" "
     local -a __BP_stack=()
     __bc_stack __BP_stack $(( 2 + ${__BASHPROF_STACK_SHIFT:-0} ))'
 
@@ -49,6 +52,7 @@ alias __BASHPROF_TAKE_NAME='
 # reaching this call site, not the ones inside it, so it stops here as well.
 alias __BASHPROF_HAND_ON='
     local __BP_inside="$__BP_id"
+    if [[ -n $__BP_had_ifs ]]; then IFS="$__BP_ifs"; else unset IFS; fi
     declare -- __BASHPROF_STACK_SHIFT='
 
 # The measured call is run unguarded: a `||` list would suppress errexit for
@@ -66,14 +70,14 @@ BASHPROF_TIME_CPS() {
     __BASHPROF_TAKE_NAME
 
     BC_INSTR say TIME_CPS BEGIN id "$__BP_id" inside "${__BP_inside-}" \
-        label "$__BP_label" "${__BP_stack[@]}" || __BC_BAIL
+        label "$__BP_label" argv "(${*@Q})" "${__BP_stack[@]}" || __BC_BAIL
 
     __BASHPROF_HAND_ON
 
     "$@"
     local __BP_rc=$?
 
-    BC_INSTR say TIME_CPS END id "$__BP_id" || __BC_BAIL
+    BC_INSTR say TIME_CPS END id "$__BP_id" status "$__BP_rc" || __BC_BAIL
 
     return "$__BP_rc"
 }

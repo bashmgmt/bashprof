@@ -12,41 +12,32 @@ use either::Either::{Left, Right};
 use hylic::prelude::{treeish, vec_fold, VecFold, VecHeap, FUSED};
 use serde::Serialize;
 
-use crate::bash::rig::{Micros, Pid};
-use crate::bash::stack::Stack;
+use serde::Deserialize;
 
 use super::nesting::Recorded;
-use super::record::{Call, Id, Record};
+use super::record::{Call, Complete, Record};
 use super::render;
 
-/// One measured call, and the ones made inside it. Every field is a fact: a
-/// call that had not ended would not be here.
+/// One measured call, and the ones made inside it. A call that had not ended
+/// would not be here, so this is a [`Complete`] and everything under it.
 ///
 /// Where the call sits among the others is the tree; the stack is not that and
 /// cannot be read off it, since an unmeasured function between two measured
 /// calls is a frame and not a node.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Span {
-    /// The name the shell gave this call, which is the only thing that tells
-    /// two measurements of one line apart.
-    pub id: Id,
-
-    pub label: String,
-    pub pid: Pid,
-    pub began: Micros,
-    pub ended: Micros,
-
-    /// The subject's walk at the moment of the call, from the call site
-    /// outward.
-    pub stack: Stack,
-
+    pub complete: Complete,
     pub children: Vec<Span>,
 }
 
 impl Span {
+    pub fn call(&self) -> &Call {
+        &self.complete.call
+    }
+
     /// BEGIN to END: this span's own work and everything inside it.
     pub fn inclusive(&self) -> u64 {
-        self.ended.0 - self.began.0
+        self.complete.took()
     }
 
     /// How much of this window no measured child was running for.
@@ -60,24 +51,32 @@ impl Span {
 
     /// How much of this window some child was running for, counted once.
     fn covered(&self) -> u64 {
+        let (began, ended) = self.window();
         let mut windows: Vec<(u64, u64)> = self
             .children
             .iter()
-            .map(|child| (child.began.0.max(self.began.0), child.ended.0.min(self.ended.0)))
+            .map(|child| {
+                let (from, upto) = child.window();
+                (from.max(began), upto.min(ended))
+            })
             .filter(|(from, upto)| from < upto)
             .collect();
 
         windows.sort();
         windows
             .iter()
-            .fold((0, self.began.0), |(covered, filled), &(from, upto)| {
+            .fold((0, began), |(covered, filled), &(from, upto)| {
                 (covered + upto.saturating_sub(from.max(filled)), filled.max(upto))
             })
             .0
     }
 
+    fn window(&self) -> (u64, u64) {
+        (self.complete.call.sent.sent_at.0, self.complete.ended_at.0)
+    }
+
     pub fn child(&self, label: &str) -> Option<&Span> {
-        self.children.iter().find(|span| span.label == label)
+        self.children.iter().find(|span| span.call().label == label)
     }
 
     /// This span and everything under it, outermost first.
@@ -86,22 +85,13 @@ impl Span {
     }
 
     /// A span states what a run measured, and nothing outside a run has.
-    pub(super) fn of(call: &Call, ended: Micros, children: Vec<Span>) -> Self {
-        Self {
-            id: call.id.clone(),
-            label: call.label.clone(),
-            pid: call.pid,
-            began: call.began,
-            ended,
-            stack: call.stack.clone(),
-            children,
-        }
+    pub(super) fn of(complete: Complete, children: Vec<Span>) -> Self {
+        Self { complete, children }
     }
 }
 
 /// The measurements a recorded forest yields, outermost first.
-#[derive(Debug, Clone, Serialize)]
-#[serde(transparent)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Profile {
     pub roots: Vec<Span>,
 }
@@ -114,11 +104,11 @@ impl fmt::Display for Profile {
             |span: &Span| {
                 format!(
                     "{} {} µs ({} µs of its own) at {} in pid {}",
-                    span.label,
+                    span.call().label,
                     span.inclusive(),
                     span.exclusive(),
-                    span.stack.at(),
-                    span.pid
+                    span.call().stack.at(),
+                    span.call().sent.pid
                 )
             },
         ))
@@ -175,7 +165,7 @@ fn salvage(readings: &[Reading]) -> Vec<Span> {
         })
         .collect();
 
-    spans.sort_by_key(|span| span.began);
+    spans.sort_by_key(|span| span.complete.call.sent.sent_at);
     spans
 }
 
@@ -186,8 +176,8 @@ fn salvage(readings: &[Reading]) -> Vec<Span> {
 fn reading() -> VecFold<Recorded, Reading> {
     vec_fold(|heap: &VecHeap<Recorded, Reading>| {
         match (&heap.node.record, measured(&heap.childresults)) {
-            (Record::Ended { call, ended }, Some(children)) => {
-                Ok(Span::of(call, *ended, children))
+            (Record::Ended(complete), Some(children)) => {
+                Ok(Span::of(complete.clone(), children))
             }
             _ => Err(salvage(&heap.childresults)),
         }

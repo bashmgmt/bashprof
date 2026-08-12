@@ -19,8 +19,8 @@ bashprof --into FILE [--output human|tree|tree-with-err|raw] -- <command…>
 | `--output` | the file holds | refuses |
 |---|---|---|
 | `human` (default) | the measured tree indented, one call per line | a run with a call the shell died inside |
-| `tree` | the same reading as a JSON array of root `Span`s | the same |
-| `tree-with-err` | `Vec<Recorded>` — every call that began, each tagged `"state": "ended"` or `"unended"` | nothing the reading can express |
+| `tree` | `Profile` — the same reading, as JSON | the same |
+| `tree-with-err` | `Vec<Recorded>` — every call that began, each under `"ended"` or `"unended"` | nothing the reading can express |
 | `raw` | every `Line` the run heard, one JSON object per line | nothing |
 
 `human` and `tree` are one reading in two hands, and the only one that can
@@ -28,12 +28,49 @@ refuse: every entry of it claims a duration, and a call that never ended has
 none. What the four share — a message the recording refuses, a transport that
 broke — fails in all of them.
 
-Each JSON shape is a derived `Serialize` over the type named in its row. The
-JSON is the struct, and a method is not a field: `Span::inclusive` and
-`Span::exclusive` are therefore not in it, `began` and `ended` are, and what
-`exclusive` does to the children is described under
-[time a span had to itself](#time-a-span-had-to-itself). `human` is the same
-reading through `Profile`'s `Display`, which does print both.
+Each JSON shape is a plain derived `Serialize` over the type in its row — no
+`flatten`, no tag attribute, nothing that buffers on the way back in. The JSON
+is the struct, so `Span::inclusive` and `Span::exclusive` are not in it; `human`
+is the same reading through `Profile`'s `Display`, which does print both.
+
+Bashprof also prints one line on stderr per source path a frame names and does
+not have. Not a failure — see
+[stack.md](stack.md#where-a-source-path-lands) — but a run whose reading is
+meant to resolve names a workspace it keeps.
+
+## The chain
+
+Each type wraps the one before it and adds what its own message carried.
+Nothing is restated, so nothing can disagree.
+
+```rust
+/// The provenance the protocol puts in front of every message.
+pub struct Sent { pid, parent, shlvl, seq, sent_at, heard_at }
+
+/// A call that began: everything its BEGIN reported.
+pub struct Call {
+    pub id: Id,
+    pub label: String,
+    pub argv: Vec<String>,      // the command being measured
+    pub stack: Stack,
+    pub sent: Sent,
+}
+
+/// A call that also ended: what its END carried back.
+pub struct Complete { pub call: Call, pub ended_at: Micros, pub status: u8 }
+
+/// A measurement: a completed call, and the calls made inside it.
+pub struct Span { pub complete: Complete, pub children: Vec<Span> }
+
+/// The tree that can hold either.
+pub enum Record { Unended(Call), Ended(Complete) }
+pub struct Recorded { pub record: Record, pub children: Arc<[Recorded]> }
+```
+
+The END carries the id, a timestamp and a status and nothing else — no walk of
+its own, because it is the same shell in the same place. `status` is what the
+measured command returned, which the wrapper knew all along and used to say
+nothing about.
 
 ### The subject owns both streams
 

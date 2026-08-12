@@ -44,7 +44,7 @@ use crate::bash::rig::{Failure, Line, Rig, Startup};
 pub use instrument::instrument;
 pub use nesting::Recorded;
 pub use profile::{Profile, Span, Unfinished};
-pub use record::{Call, Id, Record};
+pub use record::{Call, Complete, Id, Record};
 
 use nesting::nest;
 use recording::records;

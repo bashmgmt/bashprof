@@ -9,21 +9,20 @@
 //! on how it went.
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 
 use hylic::prelude::{treeish, vec_fold, VecHeap, FUSED};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::record::{Call, Id, Record};
 use super::recording::Read;
 use super::render;
 
 /// A call, and everything called inside it.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recorded {
-    #[serde(flatten)]
     pub record: Record,
-
     pub children: Arc<[Recorded]>,
 }
 
@@ -39,11 +38,32 @@ impl Recorded {
 
     fn unended_here(&self) -> Vec<&Call> {
         let own = match &self.record {
-            Record::Unended { call } => Some(call),
-            Record::Ended { .. } => None,
+            Record::Unended(call) => Some(call),
+            Record::Ended(_) => None,
         };
 
         own.into_iter().chain(self.children.iter().flat_map(Recorded::unended_here)).collect()
+    }
+
+    /// Every source path a frame in this forest names and does not have,
+    /// once each, in the order first met.
+    ///
+    /// Bash keeps a source path as it was written, so a shell that changed
+    /// directory after sourcing leaves a relative one pointing nowhere, and a
+    /// workspace the run threw away takes the instrument's own with it.
+    pub fn missing(forest: &[Recorded]) -> Vec<&Path> {
+        let mut seen: Vec<&Path> = Vec::new();
+
+        for node in forest {
+            let own = node.call().stack.frames().filter_map(|frame| frame.source.missing());
+
+            for path in own.chain(Recorded::missing(&node.children)) {
+                if !seen.contains(&path) {
+                    seen.push(path);
+                }
+            }
+        }
+        seen
     }
 
     /// The forest as it stands, ended and unended alike.
@@ -51,11 +71,11 @@ impl Recorded {
         render::forest(forest, |node: &Recorded| node.children.to_vec(), |node: &Recorded| {
             let call = node.call();
             let took = match &node.record {
-                Record::Ended { ended, .. } => format!("{} µs", ended.0 - call.began.0),
-                Record::Unended { .. } => "NEVER ENDED".to_string(),
+                Record::Ended(complete) => format!("{} µs", complete.took()),
+                Record::Unended(_) => "NEVER ENDED".to_string(),
             };
 
-            format!("{} {took} at {} in pid {}", call.label, call.stack.at(), call.pid)
+            format!("{} {took} at {} in pid {}", call.label, call.stack.at(), call.sent.pid)
         })
     }
 }

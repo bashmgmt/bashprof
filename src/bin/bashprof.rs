@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, ValueEnum};
 
 use mb_resolver::bash::rig::{run, Doing, Failure, Line};
-use mb_resolver::bashprof::{recorded, BashProf, Profile, Unfinished};
+use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished};
 
 #[derive(Parser)]
 #[command(name = "bashprof", about = "Time a tree of calls in a bash program")]
@@ -104,21 +104,35 @@ fn written(output: Output, heard: &[Line]) -> Result<String, Failure> {
         Output::Raw => heard
             .iter()
             .map(|line| {
-                let at = || format!("a message from pid {}", line.pid);
+                let at = || format!("a message from pid {}", line.sent.pid);
                 serde_json::to_string(line).doing(at)
             })
             .collect::<Result<Vec<_>, _>>()
             .map(|lines| lines.join("\n")),
 
-        Output::TreeWithErr => json(&recorded(heard)?),
+        Output::TreeWithErr => json(&read(heard)?),
         Output::Human => measured(heard).map(|profile| profile.to_string()),
         Output::Tree => measured(heard).and_then(|profile| json(&profile)),
     }
 }
 
+/// The run as a forest, and a word on stderr for every source path a frame
+/// names and does not have. Not a failure: a subject that changed directory
+/// after sourcing, or a workspace the run threw away, leaves paths that were
+/// true when they were written.
+fn read(heard: &[Line]) -> Result<Vec<Recorded>, Failure> {
+    let forest = recorded(heard)?;
+
+    for path in Recorded::missing(&forest) {
+        eprintln!("bashprof: no source at {}", path.display());
+    }
+
+    Ok(forest)
+}
+
 /// The run read as measurements, or why it has none to give.
 fn measured(heard: &[Line]) -> Result<Profile, Failure> {
-    let forest = recorded(heard)?;
+    let forest = read(heard)?;
     let reading = |unfinished: Unfinished<'_>| {
         Failure::new("reading the run as measurements", unfinished.to_string())
     };

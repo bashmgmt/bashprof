@@ -1,18 +1,22 @@
-//! One call, how it went, and the call it was made inside of.
+//! One call, and how it went.
+//!
+//! Each type here wraps the one before it and adds what its own message
+//! carried. A BEGIN is a [`Call`]; the END that closes it makes a
+//! [`Complete`]; the calls made inside one make a
+//! [`Span`](super::Span). Nothing is restated, so nothing can disagree.
 
 use std::fmt;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-use crate::bash::rig::{Micros, Pid};
+use crate::bash::rig::{Micros, Sent};
 use crate::bash::stack::Stack;
 
 /// The name a shell gave one of its calls: `$BASHPID` and a count only that
 /// shell advances, which is what makes it unique across a run's process tree.
 ///
 /// Opaque here — it is the shell's word, and nothing reads into it.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
-#[serde(transparent)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Id(pub String);
 
 impl fmt::Display for Id {
@@ -21,38 +25,63 @@ impl fmt::Display for Id {
     }
 }
 
-/// A measured call, as its BEGIN reported it.
-#[derive(Debug, Clone, Serialize)]
+/// A call that began: everything its BEGIN reported.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Call {
     pub id: Id,
+
+    /// What the call site named this measurement.
     pub label: String,
-    pub pid: Pid,
-    pub began: Micros,
+
+    /// The command being measured, as the call site wrote it — the words left
+    /// after the label.
+    pub argv: Vec<String>,
 
     /// The subject's walk at the moment of the call, from the call site
     /// outward.
     pub stack: Stack,
+
+    /// Which shell said so, and when.
+    pub sent: Sent,
 }
 
-/// A call, and how it went.
-///
-/// Which of the two a record is says nothing about whether it has children: a
-/// call the shell died inside has knowable insides, and the calls made in it
-/// named it themselves. Both variants carry the call under one name, so the
-/// tag is the only thing that differs between them in Rust and in JSON alike.
-#[derive(Debug, Clone, Serialize)]
-#[serde(tag = "state", rename_all = "lowercase")]
-pub enum Record {
-    /// The shell died inside this call.
-    Unended { call: Call },
+/// A call that also ended: what it began as, and the two things its END
+/// carried back.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Complete {
+    pub call: Call,
 
-    Ended { call: Call, ended: Micros },
+    /// The sending shell's clock at the END.
+    pub ended_at: Micros,
+
+    /// What the measured command returned.
+    pub status: u8,
+}
+
+impl Complete {
+    /// BEGIN to END: this call's own work and everything inside it.
+    pub fn took(&self) -> u64 {
+        self.ended_at.0 - self.call.sent.sent_at.0
+    }
+}
+
+/// A call as the run left it. Which variant says nothing about whether it has
+/// children: a call the shell died inside has knowable insides, and the calls
+/// made in it named it themselves.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Record {
+    /// The shell died inside this call, so no END arrived.
+    Unended(Call),
+
+    Ended(Complete),
 }
 
 impl Record {
     pub fn call(&self) -> &Call {
         match self {
-            Self::Unended { call } | Self::Ended { call, .. } => call,
+            Self::Unended(call) => call,
+            Self::Ended(complete) => &complete.call,
         }
     }
 }
