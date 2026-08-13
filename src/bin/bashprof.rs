@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use clap::{Parser, ValueEnum};
 
-use mb_resolver::bash::rig::{run, Doing, Failure, Line};
+use mb_resolver::bash::rig::{Doing, Failure, Line, Master};
 use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished};
 
 #[derive(Parser)]
@@ -70,7 +70,7 @@ fn produce(cli: &Cli) -> i32 {
         return 1;
     }
 
-    match run(&BashProf, &cli.argv) {
+    match BashProf.run(&cli.argv) {
         Err(why) => {
             eprintln!("bashprof: {why}");
             1

@@ -8,10 +8,10 @@
 //! on the wire rather than being reconstructed from it.
 //!
 //! ```no_run
-//! use mb_resolver::bash::rig::run;
+//! use mb_resolver::bash::rig::Master;
 //! use mb_resolver::bashprof::{recorded, BashProf, Profile};
 //!
-//! let ran = run(&BashProf, &["bash", "build.bash"])?;
+//! let ran = BashProf.run(&["bash", "build.bash"])?;
 //! let forest = recorded(&ran.session)?;
 //!
 //! match Profile::of(&forest) {
@@ -32,16 +32,21 @@
 pub(crate) mod reading;
 pub(crate) mod record;
 
-use crate::bash::rig::{Failure, Line, Rig, Startup};
+use crate::bash::rig::{Failure, Halt, Line, Master, Rig, Slave};
 use crate::bash::stack;
 
-/// `BASHPROF_TIME_CPS` and the three layers it expands, in every shell.
-const BASH: &str = include_str!("bashprof.bash");
+/// `BASHPROF_TIME_CPS`, the word a call site says. Shipped as an asset so a
+/// client's copy and the injected one are the same bytes, and naming nothing
+/// of the protocol.
+pub const WORDS: &str = include_str!("../../assets/bashprof.bash");
 
-/// The bash to put in a [`Startup`], for any rig that wants what bashprof
+/// `__bp_begin` and `__bp_end`, which are what make that word measure.
+pub(crate) const EFFECT: &str = include_str!("effect.bash");
+
+/// The bash a rig hands the subject, for any rig that wants what bashprof
 /// measures. The frame walk comes with it, since a measurement reports one.
 pub fn instrument() -> String {
-    stack::with(&[BASH])
+    stack::with(&[WORDS, EFFECT])
 }
 
 pub use reading::{recorded, Profile, Recorded, Span, Unfinished};
@@ -60,16 +65,21 @@ pub struct BashProf;
 impl Rig for BashProf {
     type Session = Vec<Line>;
 
-    fn startup(&self) -> Startup {
-        Startup { bash: instrument(), ..Default::default() }
+    fn bash(&self) -> String {
+        instrument()
     }
 
     fn open(&self) -> Result<Vec<Line>, Failure> {
         Ok(Vec::new())
     }
 
-    fn hear(&self, heard: &mut Vec<Line>, said: Line) -> Result<(), Failure> {
+    fn hear(&self, heard: &mut Vec<Line>, said: Line) -> Result<(), Halt> {
         heard.push(said);
         Ok(())
     }
 }
+
+/// Either orchestration. A measurement is an interval between two messages, so
+/// nothing in the reading depends on who started the shells that sent them.
+impl Master for BashProf {}
+impl Slave for BashProf {}

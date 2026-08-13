@@ -93,7 +93,7 @@ The text renderings that `Profile` and `Recorded::render` produce stay in the
 library, for a caller assembling a report of its own.
 
 Keeping a script's call sites runnable without the tool is the client's own,
-and `assets/bashprof_polyfill.bash` is what it vendors to do it — see
+and `assets/bashprof.bash` is what it vendors to do it — see
 [vendoring.md](vendoring.md).
 
 ## The layers are aliases
