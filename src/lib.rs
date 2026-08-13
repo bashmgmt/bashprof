@@ -32,13 +32,13 @@
 pub(crate) mod reading;
 pub(crate) mod record;
 
-use crate::bash::rig::{Failure, Halt, Line, Master, Rig, Slave};
+use crate::bash::rig::{Failure, Line, Master, Rig, Slave};
 use crate::bash::stack;
 
 /// `BASHPROF_TIME_CPS`, the word a call site says. Shipped as an asset so a
 /// client's copy and the injected one are the same bytes, and naming nothing
 /// of the protocol.
-pub const WORDS: &str = include_str!("../../assets/bashprof.bash");
+pub(crate) const WORDS: &str = include_str!("../../assets/bashprof.bash");
 
 /// `__bp_begin` and `__bp_end`, which are what make that word measure.
 pub(crate) const EFFECT: &str = include_str!("effect.bash");
@@ -65,15 +65,16 @@ pub struct BashProf;
 impl Rig for BashProf {
     type Session = Vec<Line>;
 
+    /// The words, their effect, and the frame walk a measurement reports.
     fn bash(&self) -> String {
-        instrument()
+        stack::with(&[WORDS, EFFECT])
     }
 
     fn open(&self) -> Result<Vec<Line>, Failure> {
         Ok(Vec::new())
     }
 
-    fn hear(&self, heard: &mut Vec<Line>, said: Line) -> Result<(), Halt> {
+    fn hear(&self, heard: &mut Vec<Line>, said: Line) -> Result<(), Failure> {
         heard.push(said);
         Ok(())
     }
