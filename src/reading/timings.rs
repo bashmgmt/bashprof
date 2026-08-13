@@ -12,9 +12,9 @@ use either::Either::{Left, Right};
 use hylic::prelude::{treeish, vec_fold, VecFold, VecHeap, FUSED};
 use serde::{Deserialize, Serialize};
 
-use super::nesting::Recorded;
-use super::record::{Call, Complete, Record};
-use super::show;
+use super::tree::Recorded;
+use crate::bashprof::record::{Call, Complete, Record};
+use crate::bashprof::show;
 
 /// One measured call, and the ones made inside it. A call that had not ended
 /// would not be here, so this is a [`Complete`] and everything under it.

@@ -16,14 +16,14 @@ use crate::bash::rig::{field, Doing, Failure, Line, Micros};
 use crate::bash::stack::Columns;
 use crate::bash::value::parse_array;
 
-use super::record::{Call, Complete, Id, Record};
+use crate::bashprof::record::{Call, Complete, Id, Record};
 
 /// The word this instrument's messages begin with.
 const TAG: &str = "TIME_CPS";
 
 /// One call the run made, and the name its shell said it was made inside of.
 ///
-/// That name is what [`nest`](super::nest) reads, and the tree it builds holds
+/// That name is what [`nest`](super::tree::nest) reads, and the tree it builds holds
 /// the same fact in its shape, so it stops here.
 pub(super) struct Read {
     pub record: Record,

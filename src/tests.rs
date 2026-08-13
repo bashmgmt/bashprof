@@ -8,8 +8,7 @@ use std::sync::Arc;
 use crate::bash::rig::{Micros, Pid, Sent};
 use crate::bash::stack::{Frame, Site, Source, Stack};
 
-use super::nesting::Recorded;
-use super::profile::{Profile, Span};
+use super::reading::{Profile, Recorded, Span};
 use super::record::{Call, Complete, Id, Record};
 
 fn call(label: &str, began: u64) -> Call {

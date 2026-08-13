@@ -15,9 +15,9 @@ use std::sync::Arc;
 use hylic::prelude::{treeish, vec_fold, VecHeap, FUSED};
 use serde::{Deserialize, Serialize};
 
-use super::record::{Call, Id, Record};
-use super::recording::Read;
-use super::show;
+use crate::bashprof::record::{Call, Id, Record};
+use super::flat::Read;
+use crate::bashprof::show;
 
 /// A call, and everything called inside it.
 #[derive(Debug, Clone, Serialize, Deserialize)]

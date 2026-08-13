@@ -26,16 +26,12 @@
 //!
 //! | | |
 //! |---|---|
-//! | `record` | one call and how it went |
-//! | `recording` | the wire read as flat records, each with the name it was told encloses it — one pass and a map |
-//! | `nesting` | those records read as a tree, which spends the names — one hylic unfold |
-//! | `profile` | that tree read as timings — one hylic fold |
+//! | `record` | one call and how it went — the vocabulary |
+//! | `reading` | the three passes from messages to measurements |
 //! | `show` | hylic's tree formatter, for either tree |
 
-mod nesting;
-mod profile;
+mod reading;
 mod record;
-mod recording;
 mod show;
 
 use crate::bash::rig::{Failure, Line, Rig, Startup};
@@ -50,12 +46,8 @@ pub fn instrument() -> String {
     stack::with(&[BASH])
 }
 
-pub use nesting::Recorded;
-pub use profile::{Profile, Span, Unfinished};
+pub use reading::{recorded, Profile, Recorded, Span, Unfinished};
 pub use record::{Call, Complete, Id, Record};
-
-use nesting::nest;
-use recording::records;
 
 #[cfg(test)]
 mod tests;
@@ -82,13 +74,4 @@ impl Rig for BashProf {
         heard.push(said);
         Ok(())
     }
-}
-
-/// What a run recorded, as the tree its calls made: every call that began,
-/// whether or not it ended.
-///
-/// Reading that as timings is [`Profile::of`], and the caller's — a test bails
-/// on a run that died mid-call, a tool reporting what it has need not.
-pub fn recorded(heard: &[Line]) -> Result<Vec<Recorded>, Failure> {
-    records(heard).map(nest)
 }
