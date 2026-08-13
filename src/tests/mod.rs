@@ -7,7 +7,7 @@
 //! | [`timing`] | a span covers its own work and everything it called |
 //! | [`walks`] | the stack a measurement carries, and moving it past a wrapper |
 //! | [`unfinished`] | a run the shell died inside, and what survives it |
-//! | [`vendoring`] | the stub a client ships, and the guard that keeps the real word |
+//! | [`vendoring`] | the word a client ships, and the guard that keeps its effect |
 
 mod arithmetic;
 mod nesting;
