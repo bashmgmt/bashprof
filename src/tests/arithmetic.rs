@@ -1,15 +1,13 @@
-//! What the reading does with a tree, over trees built by hand.
-//!
-//! Everything that needs a real shell is `tests/examples/bashprof.rs`, over
-//! this module's public surface. What is left here is arithmetic and shape.
+//! What a span had to itself, over trees built by hand — no shell, so the
+//! windows are exactly the ones under test.
 
 use std::sync::Arc;
 
 use crate::bash::rig::{Micros, Pid, Sent};
 use crate::bash::stack::{Frame, Site, Source, Stack};
 
-use super::reading::{Profile, Recorded, Span};
-use super::record::{Call, Complete, Id, Record};
+use crate::bashprof::reading::{Profile, Recorded, Span};
+use crate::bashprof::record::{Call, Complete, Id, Record};
 
 fn call(label: &str, began: u64) -> Call {
     Call {

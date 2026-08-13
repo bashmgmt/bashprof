@@ -30,8 +30,8 @@
 //! | `reading` | the three passes from messages to measurements |
 //! | `show` | hylic's tree formatter, for either tree |
 
-mod reading;
-mod record;
+pub(crate) mod reading;
+pub(crate) mod record;
 mod show;
 
 use crate::bash::rig::{Failure, Line, Rig, Startup};
