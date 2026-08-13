@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use super::record::{Call, Id, Record};
 use super::recording::Read;
-use super::render;
+use super::show;
 
 /// A call, and everything called inside it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,7 +65,7 @@ impl Recorded {
 
     /// The forest as it stands, ended and unended alike.
     pub fn render(forest: &[Recorded]) -> String {
-        render::forest(forest, |node: &Recorded| node.children.to_vec(), |node: &Recorded| {
+        show::tree(forest, |node: &Recorded| node.children.to_vec(), |node: &Recorded| {
             let call = node.record.call();
             let took = match &node.record {
                 Record::Ended(complete) => format!("{} µs", complete.took()),

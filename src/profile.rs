@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use super::nesting::Recorded;
 use super::record::{Call, Complete, Record};
-use super::render;
+use super::show;
 
 /// One measured call, and the ones made inside it. A call that had not ended
 /// would not be here, so this is a [`Complete`] and everything under it.
@@ -82,7 +82,7 @@ pub struct Profile {
 
 impl fmt::Display for Profile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&render::forest(
+        f.write_str(&show::tree(
             &self.roots,
             |span: &Span| span.children.clone(),
             |span: &Span| {

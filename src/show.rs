@@ -6,7 +6,7 @@
 use hylic::prelude::{treeish, TreeFormatCfg, FUSED};
 
 /// Each root on its own, children indented under their parent.
-pub fn forest<N: Clone + Send + Sync + 'static>(
+pub fn tree<N: Clone + Send + Sync + 'static>(
     roots: &[N],
     children: impl Fn(&N) -> Vec<N> + Send + Sync + 'static,
     head: impl Fn(&N) -> String + Send + Sync + 'static,

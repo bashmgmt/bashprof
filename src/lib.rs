@@ -30,13 +30,13 @@
 //! | `recording` | the wire read as flat records, each with the name it was told encloses it — one pass and a map |
 //! | `nesting` | those records read as a tree, which spends the names — one hylic unfold |
 //! | `profile` | that tree read as timings — one hylic fold |
-//! | `render` | hylic's tree formatter, for either tree |
+//! | `show` | hylic's tree formatter, for either tree |
 
 mod nesting;
 mod profile;
 mod record;
 mod recording;
-mod render;
+mod show;
 
 use crate::bash::rig::{Failure, Line, Rig, Startup};
 use crate::bash::stack;
