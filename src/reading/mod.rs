@@ -7,9 +7,11 @@
 //! | [`timings`] | that forest → measurements | one `vec_fold` |
 //!
 //! [`recorded`] is the whole of it and the only way in; what passes between
-//! the passes is nobody else's.
+//! the passes is nobody else's. `show` is hylic's tree formatter, which the
+//! last two passes both render through.
 
 mod flat;
+mod show;
 mod timings;
 mod tree;
 

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use super::tree::Recorded;
 use crate::bashprof::record::{Call, Complete, Record};
-use crate::bashprof::show;
+use super::show;
 
 /// One measured call, and the ones made inside it. A call that had not ended
 /// would not be here, so this is a [`Complete`] and everything under it.

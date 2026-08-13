@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::bashprof::record::{Call, Id, Record};
 use super::flat::Read;
-use crate::bashprof::show;
+use super::show;
 
 /// A call, and everything called inside it.
 #[derive(Debug, Clone, Serialize, Deserialize)]

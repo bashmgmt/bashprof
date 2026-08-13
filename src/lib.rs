@@ -28,11 +28,9 @@
 //! |---|---|
 //! | `record` | one call and how it went — the vocabulary |
 //! | `reading` | the three passes from messages to measurements |
-//! | `show` | hylic's tree formatter, for either tree |
 
 pub(crate) mod reading;
 pub(crate) mod record;
-mod show;
 
 use crate::bash::rig::{Failure, Line, Rig, Startup};
 use crate::bash::stack;
