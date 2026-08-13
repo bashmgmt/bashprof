@@ -32,7 +32,6 @@
 //! | `profile` | that tree read as timings — one hylic fold |
 //! | `render` | hylic's tree formatter, for either tree |
 
-mod instrument;
 mod nesting;
 mod profile;
 mod record;
@@ -40,8 +39,17 @@ mod recording;
 mod render;
 
 use crate::bash::rig::{Failure, Line, Rig, Startup};
+use crate::bash::stack;
 
-pub use instrument::instrument;
+/// `BASHPROF_TIME_CPS` and the three layers it expands, in every shell.
+const BASH: &str = include_str!("bashprof.bash");
+
+/// The bash to put in a [`Startup`], for any rig that wants what bashprof
+/// measures. The frame walk comes with it, since a measurement reports one.
+pub fn instrument() -> String {
+    stack::with(&[BASH])
+}
+
 pub use nesting::Recorded;
 pub use profile::{Profile, Span, Unfinished};
 pub use record::{Call, Complete, Id, Record};
