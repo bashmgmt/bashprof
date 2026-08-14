@@ -48,9 +48,11 @@ enum Output {
 fn main() {
     let code = match Cli::try_parse() {
         Ok(cli) => produce(&cli),
+        // `--help` and `--version` are complaints too, and clap gives them
+        // their own code — 0, where a real misuse is 2.
         Err(complaint) => {
             let _ = complaint.print();
-            2
+            complaint.exit_code()
         }
     };
 
