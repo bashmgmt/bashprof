@@ -3,8 +3,9 @@
 
 use std::sync::Arc;
 
-use crate::bash::rig::{Micros, Pid, Sent};
+use crate::bash::rig::{Micros, Sent};
 use crate::bash::stack::{Frame, Site, Source, Stack};
+use crate::tests::accounts;
 
 use crate::bashprof::reading::{Profile, Recorded, Span};
 use crate::bashprof::record::{Call, Complete, Id, Record};
@@ -21,14 +22,8 @@ fn call(label: &str, began: u64) -> Call {
             args: None,
         }])
         .unwrap(),
-        sent: Sent {
-            pid: Pid(1),
-            parent: Pid(0),
-            shlvl: 1,
-            seq: 0,
-            sent_at: Micros(began),
-            heard_at: Micros(began),
-        },
+        shell: accounts::reading("/x.bash"),
+        sent: Sent { nth: began, seq: 0, sent_at: Micros(began), heard_at: Micros(began) },
     }
 }
 

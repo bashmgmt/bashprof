@@ -21,7 +21,7 @@ mod tree;
 
 use std::fmt;
 
-use crate::bash::rig::{Failure, Line};
+use crate::bash::rig::{Failure, Said};
 
 pub use timings::{Profile, Span, Unfinished};
 pub use tree::Recorded;
@@ -31,7 +31,7 @@ pub use tree::Recorded;
 ///
 /// Reading that as measurements is [`Profile::of`], and the caller's — a test
 /// bails on a run that died mid-call, a tool reporting what it has need not.
-pub fn recorded(heard: &[Line]) -> Result<Vec<Recorded>, Unread> {
+pub fn recorded(heard: &[Said<'_>]) -> Result<Vec<Recorded>, Unread> {
     let (records, mut unreadable) = flat::records(heard);
     let read = records.len();
     let resolved = tree::nest(records);

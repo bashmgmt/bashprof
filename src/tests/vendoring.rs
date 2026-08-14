@@ -3,7 +3,7 @@
 
 use std::process::Command;
 
-use crate::bash::rig::{ExitStatus, Master};
+use crate::bash::rig::{heard, ExitStatus, Master};
 use crate::bash;
 use crate::bashprof::{recorded, BashProf, Profile, WORDS};
 use crate::tests::scripts::{bash, Scripts};
@@ -55,12 +55,12 @@ fn the_vendored_word_runs_an_instrumented_script_unprofiled() {
 #[test]
 fn the_guard_leaves_the_real_hooks_in_place_under_the_tool() {
     let scripts = vendoring();
-    let (heard, status) =
-        BashProf.run(&bash(scripts.at("build.bash"))).unwrap().whole().unwrap();
+    let ran = BashProf.run(&bash(scripts.at("build.bash"))).unwrap().whole().unwrap();
 
-    assert_eq!(status, ExitStatus::Code(0));
+    assert_eq!(ran.subject, ExitStatus::Code(0));
 
-    let profile = Profile::of(&recorded(&heard).unwrap()).expect("the call was measured");
+    let forest = recorded(&heard(&ran.shells)).unwrap();
+    let profile = Profile::of(&forest).expect("the call was measured");
 
     assert_eq!(profile.roots.len(), 1, "the client's copy did not displace the effect");
     assert_eq!(profile.roots[0].complete.call.label, "build");

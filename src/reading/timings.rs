@@ -94,7 +94,7 @@ impl fmt::Display for Profile {
                     span.complete.took(),
                     span.exclusive(),
                     call.stack.at(),
-                    call.sent.pid
+                    call.shell.pid
                 )
             },
         ))

@@ -9,11 +9,11 @@ use super::*;
 /// Everything the run recorded, and why the rest did not.
 fn read(script: &str) -> Result<Vec<Recorded>, Unread> {
     let scripts = Scripts::of(&[("subject.bash", script)]);
-    let (heard, status) = BashProf.run(&bash(scripts.at("subject.bash"))).unwrap().whole().unwrap();
+    let ran = BashProf.run(&bash(scripts.at("subject.bash"))).unwrap().whole().unwrap();
 
-    assert_eq!(status, ExitStatus::Code(0), "the subject itself is fine");
+    assert_eq!(ran.subject, ExitStatus::Code(0), "the subject itself is fine");
 
-    recorded(&heard)
+    recorded(&heard(&ran.shells))
 }
 
 /// A BEGIN with a field missing is set aside, and the calls around it are no

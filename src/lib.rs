@@ -8,13 +8,13 @@
 //! on the wire rather than being reconstructed from it.
 //!
 //! ```no_run
-//! use mb_resolver::bash::rig::Master;
+//! use mb_resolver::bash::rig::{heard, Master};
 //! use mb_resolver::bashprof::{recorded, BashProf, Profile};
 //!
 //! let ran = BashProf.run(&["bash", "build.bash"])?;
 //!
 //! // Two readings, and each hands back what it did read when it refuses.
-//! let forest = recorded(&ran.session).unwrap_or_else(|unread| unread.resolved);
+//! let forest = recorded(&heard(&ran.shells)).unwrap_or_else(|unread| unread.resolved);
 //!
 //! match Profile::of(&forest) {
 //!     Ok(profile) => println!("{profile}"),
@@ -34,7 +34,9 @@
 pub(crate) mod reading;
 pub(crate) mod record;
 
-use crate::bash::rig::{Failure, Line, Master, Rig, Slave};
+use std::sync::Arc;
+
+use crate::bash::rig::{Failure, Laid, Line, Master, Rig, Shell, Slave};
 use crate::bash::stack;
 
 /// `BASHPROF_TIME_CPS`, the word a call site says. Shipped as an asset so a
@@ -57,28 +59,22 @@ pub use record::{Call, Complete, Id, Record};
 #[cfg(test)]
 mod tests;
 
-/// The rig: inject the instrument, keep what the run says.
+/// The rig: inject the instrument, keep what each shell says.
 ///
-/// The session is every message heard. Which shell sent one and when is on the
-/// message already, and so is the call it belongs to, so there is nothing to
-/// keep up as they arrive.
+/// Every message carries the name of the call it belongs to, so the tree is on
+/// the wire and there is nothing to keep up as they arrive — the reaction is
+/// the one that keeps every message.
 pub struct BashProf;
 
 impl Rig for BashProf {
-    type Session = Vec<Line>;
+    type Attending = Vec<Line>;
 
-    /// The words, their effect, and the frame walk a measurement reports.
     fn bash(&self) -> String {
-        stack::with(&[WORDS, EFFECT])
+        instrument()
     }
 
-    fn open(&self) -> Result<Vec<Line>, Failure> {
+    fn joined(&self, _at: &Laid, _shell: Arc<Shell>) -> Result<Vec<Line>, Failure> {
         Ok(Vec::new())
-    }
-
-    fn hear(&self, heard: &mut Vec<Line>, said: Line) -> Result<(), Failure> {
-        heard.push(said);
-        Ok(())
     }
 }
 

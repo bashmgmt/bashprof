@@ -6,10 +6,11 @@
 //! [`Span`](super::Span). Nothing is restated, so nothing can disagree.
 
 use std::fmt;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::bash::rig::{Micros, Sent};
+use crate::bash::rig::{Micros, Sent, Shell};
 use crate::bash::stack::Stack;
 
 /// The name a shell gave one of its calls: `$BASHPID` and a count only that
@@ -41,7 +42,10 @@ pub struct Call {
     /// outward.
     pub stack: Stack,
 
-    /// Which shell said so, and when.
+    /// Which shell said so — the one the walk above was taken in.
+    pub shell: Arc<Shell>,
+
+    /// When it said so.
     pub sent: Sent,
 }
 

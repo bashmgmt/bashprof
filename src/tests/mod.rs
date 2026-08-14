@@ -20,7 +20,7 @@ mod walks;
 
 use std::collections::HashSet;
 
-use crate::bash::rig::{ExitStatus, Master};
+use crate::bash::rig::{heard, ExitStatus, Master};
 use crate::bashprof::{recorded, BashProf, Call, Profile, Recorded, Span, Unread};
 use crate::tests::scripts::{bash, Scripts};
 
@@ -29,10 +29,9 @@ use crate::tests::scripts::{bash, Scripts};
 /// which is what each test below does next.
 fn profiled(script: &str) -> (Vec<Recorded>, ExitStatus) {
     let scripts = Scripts::of(&[("subject.bash", script)]);
-    let (heard, status) =
-        BashProf.run(&bash(scripts.at("subject.bash"))).unwrap().whole().unwrap();
+    let ran = BashProf.run(&bash(scripts.at("subject.bash"))).unwrap().whole().unwrap();
 
-    (recorded(&heard).expect("the instrument's own messages"), status)
+    (recorded(&heard(&ran.shells)).expect("the instrument's own messages"), ran.subject)
 }
 
 /// The labels of the calls that never ended.

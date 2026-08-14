@@ -12,8 +12,7 @@
 
 use std::collections::HashMap;
 
-use crate::bash::rig::{field, shells, Doing, Failure, Line, Micros};
-use crate::bash::shell::Bash;
+use crate::bash::rig::{field, Doing, Failure, Micros, Said};
 use crate::bash::stack::Columns;
 use crate::bash::value::parse_array;
 
@@ -39,23 +38,15 @@ pub(super) struct Read {
 /// one was set aside falls out of the tree by itself, which is what the next
 /// pass counts.
 ///
-/// Read shell by shell, because a walk means nothing without the shell it was
-/// taken in. Nothing else depends on the order: a name is found through a map
+/// Nothing depends on the order these arrive in: a name is found through a map
 /// and the records are sorted by the clock at the end.
-pub(super) fn records(heard: &[Line]) -> (Vec<Read>, Vec<Failure>) {
+pub(super) fn records(heard: &[Said<'_>]) -> (Vec<Read>, Vec<Failure>) {
     let mut reading = Reading::default();
     let mut unreadable = Vec::new();
 
-    let shells = match shells(heard) {
-        Ok(shells) => shells,
-        Err(why) => return (Vec::new(), vec![why]),
-    };
-
-    for shell in &shells {
-        for line in &shell.lines {
-            if let Err(why) = reading.hear(line, &shell.joined.bash) {
-                unreadable.push(why);
-            }
+    for &said in heard {
+        if let Err(why) = reading.hear(said) {
+            unreadable.push(why);
         }
     }
 
@@ -87,15 +78,15 @@ struct Reading {
 
 impl Reading {
     /// One message. Anything not this instrument's is someone else's.
-    fn hear(&mut self, line: &Line, shell: &Bash) -> Result<(), Failure> {
-        let Some(payload) = line.behind(TAG) else { return Ok(()) };
+    fn hear(&mut self, said: Said<'_>) -> Result<(), Failure> {
+        let Some(payload) = said.line.behind(TAG) else { return Ok(()) };
         let Some((kind, rest)) = payload.split_first() else {
             return Err(reading("an empty TIME_CPS message"));
         };
 
         match kind.as_str() {
-            "BEGIN" => self.begin(line, rest, shell),
-            "END" => self.end(rest, line.sent.sent_at),
+            "BEGIN" => self.begin(said, rest),
+            "END" => self.end(rest, said.line.sent.sent_at),
             other => Err(reading(format!("unknown kind {other:?}"))),
         }
     }
@@ -105,8 +96,8 @@ impl Reading {
     ///
     /// Nothing is written before every check has passed, so a message set
     /// aside leaves the reading as it found it.
-    fn begin(&mut self, line: &Line, rest: &[String], shell: &Bash) -> Result<(), Failure> {
-        let (call, inside) = began(line, rest, shell)?;
+    fn begin(&mut self, said: Said<'_>, rest: &[String]) -> Result<(), Failure> {
+        let (call, inside) = began(said, rest)?;
 
         if self.at.contains_key(&call.id) {
             return Err(reading(format!("a second call named {}", call.id)));
@@ -153,8 +144,11 @@ impl Reading {
             })
             .collect();
 
-        records
-            .sort_by_key(|read| (read.record.call().sent.sent_at, read.record.call().sent.pid.0));
+        records.sort_by_key(|read| {
+            let sent = read.record.call().sent;
+
+            (sent.sent_at, sent.nth)
+        });
         records
     }
 }
@@ -166,7 +160,7 @@ fn named(rest: &[String]) -> Result<Id, Failure> {
 
 /// The call one BEGIN reports, and the name it says encloses it. The outermost
 /// call is made inside nothing, and says so with a name it leaves empty.
-fn began(line: &Line, rest: &[String], shell: &Bash) -> Result<(Call, Option<Id>), Failure> {
+fn began(said: Said<'_>, rest: &[String]) -> Result<(Call, Option<Id>), Failure> {
     let word = |key: &str| {
         field(rest, key).ok_or_else(|| reading(format!("a BEGIN with no {key:?}"))).map(str::to_string)
     };
@@ -175,8 +169,9 @@ fn began(line: &Line, rest: &[String], shell: &Bash) -> Result<(Call, Option<Id>
         id: named(rest)?,
         label: word("label")?,
         argv: parse_array(&word("argv")?).doing(|| "reading a BEGIN's argv".to_string())?,
-        stack: Columns::of(rest)?.frames(shell)?,
-        sent: line.sent.clone(),
+        stack: Columns::of(rest)?.frames(said.shell)?,
+        shell: said.shell.clone(),
+        sent: said.line.sent,
     };
 
     Ok((call, Some(word("inside")?).filter(|inside| !inside.is_empty()).map(Id)))

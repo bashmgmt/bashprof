@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use clap::{Parser, ValueEnum};
 
-use mb_resolver::bash::rig::{Doing, Failure, Line, Master};
+use mb_resolver::bash::rig::{heard, Doing, Failure, Master, Said};
 use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
 
 #[derive(Parser)]
@@ -40,8 +40,8 @@ enum Output {
     /// tagged `"state": "ended"` or `"state": "unended"`.
     TreeWithErr,
 
-    /// Every message the run heard, one JSON object per line, before any of it
-    /// is read as calls.
+    /// Every message the run heard, with the shell that sent it: one JSON
+    /// object per line, before any of it is read as calls.
     Raw,
 }
 
@@ -76,7 +76,7 @@ fn produce(cli: &Cli) -> i32 {
             1
         }
         Ok(ran) => {
-            let wrote = written(cli.output, &ran.session)
+            let wrote = written(cli.output, &heard(&ran.shells))
                 .and_then(|text| write(&cli.into, text + "\n"))
                 .and_then(|()| ran.failed.map_or(Ok(()), Err))
                 .map_err(|why| eprintln!("bashprof: {why}"));
@@ -99,13 +99,13 @@ fn write(into: &Path, text: String) -> Result<(), Failure> {
 /// refuse: every entry of it claims a duration, and a call the shell died
 /// inside has none. The other two report what the run said, which is defined
 /// however it ended.
-fn written(output: Output, heard: &[Line]) -> Result<String, Failure> {
+fn written(output: Output, heard: &[Said<'_>]) -> Result<String, Failure> {
     match output {
         Output::Raw => heard
             .iter()
-            .map(|line| {
-                let at = || format!("a message from pid {}", line.sent.pid);
-                serde_json::to_string(line).doing(at)
+            .map(|said| {
+                let at = || format!("a message from pid {}", said.shell.pid);
+                serde_json::to_string(said).doing(at)
             })
             .collect::<Result<Vec<_>, _>>()
             .map(|lines| lines.join("\n")),
@@ -120,7 +120,7 @@ fn written(output: Output, heard: &[Line]) -> Result<String, Failure> {
 /// names and does not have. Not a failure: a subject that changed directory
 /// after sourcing, or a workspace the run threw away, leaves paths that were
 /// true when they were written.
-fn read(heard: &[Line]) -> Result<Vec<Recorded>, Unread> {
+fn read(heard: &[Said<'_>]) -> Result<Vec<Recorded>, Unread> {
     let forest = recorded(heard);
 
     for path in Recorded::missing(forest.as_ref().unwrap_or_else(|unread| &unread.resolved)) {
@@ -133,7 +133,7 @@ fn read(heard: &[Line]) -> Result<Vec<Recorded>, Unread> {
 /// What the run recorded, whether or not all of it read back. This output
 /// reports what the run said, so a message the instrument wrote and mangled is
 /// a word on stderr rather than the end of it.
-fn salvaged(heard: &[Line]) -> Vec<Recorded> {
+fn salvaged(heard: &[Said<'_>]) -> Vec<Recorded> {
     read(heard).unwrap_or_else(|unread| {
         eprintln!("bashprof: {unread}");
 
@@ -143,7 +143,7 @@ fn salvaged(heard: &[Line]) -> Vec<Recorded> {
 
 /// The run read as measurements, or why it has none to give. Every entry
 /// claims a duration, so a partial reading is no more use here than none.
-fn measured(heard: &[Line]) -> Result<Profile, Failure> {
+fn measured(heard: &[Said<'_>]) -> Result<Profile, Failure> {
     let forest = read(heard).map_err(|unread| Failure::new("reading the run", unread.to_string()))?;
     let reading = |unfinished: Unfinished<'_>| {
         Failure::new("reading the run as measurements", unfinished.to_string())

@@ -72,7 +72,7 @@ impl Recorded {
                 Record::Unended(_) => "NEVER ENDED".to_string(),
             };
 
-            format!("{} {took} at {} in pid {}", call.label, call.stack.at(), call.sent.pid)
+            format!("{} {took} at {} in pid {}", call.label, call.stack.at(), call.shell.pid)
         })
     }
 }
