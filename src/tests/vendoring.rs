@@ -15,13 +15,21 @@ const GUARD: &str =
 
 /// A script whose call sites are guarded the way a shipped one's would be.
 /// What it sources is the file the tool injects, byte for byte.
+///
+/// `set -euo pipefail` because that is what a shipped script has, and because
+/// it is the option that reaches furthest into the tool: every name the hooks
+/// read has to be one they set, an unset one being an error rather than empty.
+/// Under a driven run `BASH_ENV` is read before the script sets it, so it is
+/// the hooks' own bodies that run under it — and a client that joins a session
+/// of its own sets it before anything of the tool's is sourced at all.
 fn vendoring() -> Scripts {
     Scripts::of(&[
         ("bashprof.bash", WORDS),
         (
             "build.bash",
             &format!(
-                "source \"$(dirname \"${{BASH_SOURCE[0]}}\")/bashprof.bash\"\n{GUARD}\n\
+                "set -euo pipefail\n\
+                 source \"$(dirname \"${{BASH_SOURCE[0]}}\")/bashprof.bash\"\n{GUARD}\n\
                  step() {{ echo \"ran $1\"; }}\n\
                  BASHPROF_TIME_CPS build step target\n"
             ),

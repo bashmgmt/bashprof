@@ -11,7 +11,9 @@
 #
 # `__BP_made` is not local — one count per shell, which a fork inherits and
 # then advances its own copy of, under its own pid. $BASHPID differs in every
-# process, so the two together name a call across the run's process tree.
+# process, so the two together name a call across the run's process tree. It is
+# unset until the first measured call, and read through `:-0` for the same
+# reason as the shift above.
 #
 # `__BP_id` is the word's local, declared empty there and filled here.
 # `__BP_inside` is not the word's yet: it resolves to the enclosing call's,
@@ -22,7 +24,7 @@ __bp_begin() {
     local -a __BP_stack=()
     __bc_stack __BP_stack $(( 3 + ${__BASHPROF_STACK_SHIFT:-0} ))
 
-    __BP_made=$(( __BP_made + 1 ))
+    __BP_made=$(( ${__BP_made:-0} + 1 ))
     __BP_id="$BASHPID.$__BP_made"
 
     BC_INSTR say TIME_CPS BEGIN id "$__BP_id" inside "${__BP_inside-}" \
