@@ -1,16 +1,56 @@
-//! Run a bash command under the profiler and write what its measured calls
+//! Time a tree of calls in a bash program, and write what its measured calls
 //! recorded.
+//!
+//! Two ways in, and they differ only in who started the shells. `run_bash_env`
+//! starts a command line and reaches its whole process tree through
+//! `BASH_ENV`; `serve` is started *by* a bash script and hands that script the
+//! address to join. A span is the interval between two messages either way —
+//! which is why both take the same options, from the same type.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use clap::{Parser, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use mb_resolver::bash::rig::{heard, Doing, Failure, Master, Said};
+use mb_resolver::bash::rig::{heard, Attended, Doing, Failure, Line, Master, Said, Slave};
 use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
 
 #[derive(Parser)]
 #[command(name = "bashprof", about = "Time a tree of calls in a bash program")]
 struct Cli {
+    #[command(subcommand)]
+    what: What,
+}
+
+#[derive(Subcommand)]
+enum What {
+    /// Profile a command line, reaching every shell it starts through
+    /// BASH_ENV.
+    #[command(name = "run_bash_env")]
+    RunBashEnv {
+        #[command(flatten)]
+        reading: Reading,
+
+        /// The wrapped command, program included — `bash build.bash`, or
+        /// `make test`, whose own shells join too. Everything from the first
+        /// plain word on is the subject's; a command that itself starts with a
+        /// dash goes behind `--`.
+        #[arg(trailing_var_arg = true, required = true)]
+        argv: Vec<String>,
+    },
+
+    /// Profile for a bash script that started this process as a coprocess: it
+    /// holds this process's standard input, and reads the address to join from
+    /// its standard output.
+    Serve {
+        #[command(flatten)]
+        reading: Reading,
+    },
+}
+
+/// What to write and how far to read the run first — the same question in both
+/// roles.
+#[derive(Args)]
+struct Reading {
     /// Where the reading goes. The subject owns both streams, so nothing of
     /// bashprof's is written to them but its own failures.
     #[arg(long)]
@@ -19,13 +59,6 @@ struct Cli {
     /// How far the run is read before it is written, and in what.
     #[arg(long, value_enum, default_value_t = Output::Human)]
     output: Output,
-
-    /// The wrapped command, program included — `bash build.bash`, or
-    /// `make test`, whose own shells join too. Everything from the first
-    /// plain word on is the subject's; a command that itself starts with a
-    /// dash goes behind `--`.
-    #[arg(trailing_var_arg = true, required = true)]
-    argv: Vec<String>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
@@ -45,9 +78,52 @@ enum Output {
     Raw,
 }
 
+impl Reading {
+    /// Truncate before a shell can join, so an unwritable path is known
+    /// straight away and a run that reads as nothing leaves nothing earlier
+    /// standing in for its reading.
+    fn claim(&self) -> Result<(), Failure> {
+        self.write(String::new())
+    }
+
+    fn write(&self, text: String) -> Result<(), Failure> {
+        std::fs::write(&self.into, text).doing(|| format!("writing {}", self.into.display()))
+    }
+
+    /// What the shells said, read as far as this asks for, and written.
+    fn keep(&self, shells: &[Attended<Vec<Line>>]) -> Result<(), Failure> {
+        let text = self.written(&heard(shells))?;
+
+        self.write(text + "\n")
+    }
+
+    /// What goes into the file, or what stopped it being knowable.
+    ///
+    /// `Human` and `Tree` are one reading in two hands, and the only one that
+    /// can refuse: every entry of it claims a duration, and a call the shell
+    /// died inside has none. The other two report what the run said, which is
+    /// defined however it ended.
+    fn written(&self, heard: &[Said<'_>]) -> Result<String, Failure> {
+        match self.output {
+            Output::Raw => heard
+                .iter()
+                .map(|said| {
+                    let at = || format!("a message from pid {}", said.shell.pid);
+                    serde_json::to_string(said).doing(at)
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map(|lines| lines.join("\n")),
+
+            Output::TreeWithErr => json(&salvaged(heard)),
+            Output::Human => measured(heard).map(|profile| profile.to_string()),
+            Output::Tree => measured(heard).and_then(|profile| json(&profile)),
+        }
+    }
+}
+
 fn main() {
     let code = match Cli::try_parse() {
-        Ok(cli) => produce(&cli),
+        Ok(cli) => perform(&cli.what),
         // `--help` and `--version` are complaints too, and clap gives them
         // their own code — 0, where a real misuse is 2.
         Err(complaint) => {
@@ -59,27 +135,37 @@ fn main() {
     std::process::exit(code);
 }
 
+fn perform(what: &What) -> i32 {
+    match what {
+        What::RunBashEnv { reading, argv } => run(reading, argv),
+        What::Serve { reading } => match serve(reading) {
+            Ok(()) => 0,
+            Err(why) => {
+                eprintln!("bashprof: {why}");
+                1
+            }
+        },
+    }
+}
+
 /// The subject's own status wherever the subject failed, so a profiled script
 /// is indistinguishable from an unprofiled one. Where the subject succeeded
 /// and bashprof could not write what was asked for, the failure is bashprof's
 /// and so is the status.
-fn produce(cli: &Cli) -> i32 {
-    // Truncated before the subject starts, so an unwritable path is known
-    // straight away and a run that reads as nothing leaves nothing earlier
-    // standing in for its reading.
-    if let Err(why) = write(&cli.into, String::new()) {
+fn run(reading: &Reading, argv: &[String]) -> i32 {
+    if let Err(why) = reading.claim() {
         eprintln!("bashprof: {why}");
         return 1;
     }
 
-    match BashProf.run(&cli.argv) {
+    match BashProf.run(argv) {
         Err(why) => {
             eprintln!("bashprof: {why}");
             1
         }
         Ok(ran) => {
-            let wrote = written(cli.output, &heard(&ran.shells))
-                .and_then(|text| write(&cli.into, text + "\n"))
+            let wrote = reading
+                .keep(&ran.shells)
                 .and_then(|()| ran.failed.map_or(Ok(()), Err))
                 .map_err(|why| eprintln!("bashprof: {why}"));
 
@@ -91,31 +177,16 @@ fn produce(cli: &Cli) -> i32 {
     }
 }
 
-fn write(into: &Path, text: String) -> Result<(), Failure> {
-    std::fs::write(into, text).doing(|| format!("writing {}", into.display()))
-}
+/// Nothing here starts a shell or ends one, so there is no subject's status to
+/// hand back — only whether the reading came out whole. The client's `BC_LEAVE`
+/// waits for this process, so that status is what its own `set -e` sees.
+fn serve(reading: &Reading) -> Result<(), Failure> {
+    reading.claim()?;
 
-/// What goes into the file, or what stopped it being knowable.
-///
-/// `Human` and `Tree` are one reading in two hands, and the only one that can
-/// refuse: every entry of it claims a duration, and a call the shell died
-/// inside has none. The other two report what the run said, which is defined
-/// however it ended.
-fn written(output: Output, heard: &[Said<'_>]) -> Result<String, Failure> {
-    match output {
-        Output::Raw => heard
-            .iter()
-            .map(|said| {
-                let at = || format!("a message from pid {}", said.shell.pid);
-                serde_json::to_string(said).doing(at)
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map(|lines| lines.join("\n")),
+    let served = BashProf.serve_coprocess()?;
 
-        Output::TreeWithErr => json(&salvaged(heard)),
-        Output::Human => measured(heard).map(|profile| profile.to_string()),
-        Output::Tree => measured(heard).and_then(|profile| json(&profile)),
-    }
+    reading.keep(&served.shells)?;
+    served.failed.map_or(Ok(()), Err)
 }
 
 /// The run as a forest, and a word on stderr for every source path a frame

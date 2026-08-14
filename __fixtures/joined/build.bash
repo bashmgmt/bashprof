@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # A build script that measures itself, with or without anything listening.
 #
-#     build.bash                              # just build
-#     build.bash <the server's command line…>  # build, and keep the timings
+#     build.bash                                     # just build
+#     build.bash bashprof serve --into build.times   # build, and keep the timings
 #
 # A shipped client vendors copies of the two files below; this one sources them
 # where they live, so the test and the tool cannot drift apart.
