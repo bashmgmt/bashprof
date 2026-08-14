@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, ValueEnum};
 
 use mb_resolver::bash::rig::{Doing, Failure, Line, Master};
-use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished};
+use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
 
 #[derive(Parser)]
 #[command(name = "bashprof", about = "Time a tree of calls in a bash program")]
@@ -110,7 +110,7 @@ fn written(output: Output, heard: &[Line]) -> Result<String, Failure> {
             .collect::<Result<Vec<_>, _>>()
             .map(|lines| lines.join("\n")),
 
-        Output::TreeWithErr => json(&read(heard)?),
+        Output::TreeWithErr => json(&salvaged(heard)),
         Output::Human => measured(heard).map(|profile| profile.to_string()),
         Output::Tree => measured(heard).and_then(|profile| json(&profile)),
     }
@@ -120,19 +120,31 @@ fn written(output: Output, heard: &[Line]) -> Result<String, Failure> {
 /// names and does not have. Not a failure: a subject that changed directory
 /// after sourcing, or a workspace the run threw away, leaves paths that were
 /// true when they were written.
-fn read(heard: &[Line]) -> Result<Vec<Recorded>, Failure> {
-    let forest = recorded(heard)?;
+fn read(heard: &[Line]) -> Result<Vec<Recorded>, Unread> {
+    let forest = recorded(heard);
 
-    for path in Recorded::missing(&forest) {
+    for path in Recorded::missing(forest.as_ref().unwrap_or_else(|unread| &unread.resolved)) {
         eprintln!("bashprof: no source at {}", path.display());
     }
 
-    Ok(forest)
+    forest
 }
 
-/// The run read as measurements, or why it has none to give.
+/// What the run recorded, whether or not all of it read back. This output
+/// reports what the run said, so a message the instrument wrote and mangled is
+/// a word on stderr rather than the end of it.
+fn salvaged(heard: &[Line]) -> Vec<Recorded> {
+    read(heard).unwrap_or_else(|unread| {
+        eprintln!("bashprof: {unread}");
+
+        unread.resolved
+    })
+}
+
+/// The run read as measurements, or why it has none to give. Every entry
+/// claims a duration, so a partial reading is no more use here than none.
 fn measured(heard: &[Line]) -> Result<Profile, Failure> {
-    let forest = read(heard)?;
+    let forest = read(heard).map_err(|unread| Failure::new("reading the run", unread.to_string()))?;
     let reading = |unfinished: Unfinished<'_>| {
         Failure::new("reading the run as measurements", unfinished.to_string())
     };

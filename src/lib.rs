@@ -12,7 +12,9 @@
 //! use mb_resolver::bashprof::{recorded, BashProf, Profile};
 //!
 //! let ran = BashProf.run(&["bash", "build.bash"])?;
-//! let forest = recorded(&ran.session)?;
+//!
+//! // Two readings, and each hands back what it did read when it refuses.
+//! let forest = recorded(&ran.session).unwrap_or_else(|unread| unread.resolved);
 //!
 //! match Profile::of(&forest) {
 //!     Ok(profile) => println!("{profile}"),
@@ -49,7 +51,7 @@ pub fn instrument() -> String {
     stack::with(&[WORDS, EFFECT])
 }
 
-pub use reading::{recorded, Profile, Recorded, Span, Unfinished};
+pub use reading::{recorded, Profile, Recorded, Span, Unfinished, Unread};
 pub use record::{Call, Complete, Id, Record};
 
 #[cfg(test)]

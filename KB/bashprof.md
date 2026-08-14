@@ -204,13 +204,25 @@ Three lookups, and every one of them the instrument's fault if it fails:
 
 | | |
 |---|---|
-| a name is given once | a second BEGIN under one name is refused |
-| a name is ended once | a second END for one name is refused |
-| every name pointed at was given | a call made inside a name that never began is refused |
+| a name is given once | a second BEGIN under one name is set aside |
+| a name is ended once | a second END for one name is set aside |
+| every name pointed at was given | a call made inside a name that never began falls out of the tree |
 
 Nothing else can go wrong in the placement, because nothing else is decided
 there. In particular there is no ambiguity to report: the shell said where the
 call belongs.
+
+A message set aside does not end the reading. The pass carries on and collects
+what it could not read, because what the other messages said is no less true —
+and a call whose enclosing one was set aside is then unreachable from any root,
+so nesting drops it. That the tree is shorter than what was read is the only
+record of that, and it is the forest's own shape rather than a count kept
+alongside it.
+
+`recorded()` yields `Result<Vec<Recorded>, Unread>`, and `Unread` carries the
+forest. It is the same shape as `Unfinished` below and not the same news: this
+one means the instrument or the wire faulted, that one means a shell died
+inside a call it had begun.
 
 ## The stack a node carries
 
@@ -255,7 +267,10 @@ it is not a measurement either.
 
 `Unfinished` carries the measurements that did complete, which are no less true
 for the run having ended badly. A test bails on it; a tool reporting what it has
-need not. That choice is made once, at the top.
+need not. That choice is made once, at the top — and the tool makes it twice
+over, `--output tree-with-err` reporting what a partial reading holds while
+`--output human` and `--output tree` refuse, every entry of those claiming a
+duration.
 
 ## See also
 

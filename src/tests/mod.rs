@@ -7,19 +7,21 @@
 //! | [`timing`] | a span covers its own work and everything it called |
 //! | [`walks`] | the stack a measurement carries, and moving it past a wrapper |
 //! | [`unfinished`] | a run the shell died inside, and what survives it |
+//! | [`unread`] | a message the instrument mangled, and what survives it |
 //! | [`vendoring`] | the word a client ships, and the guard that keeps its effect |
 
 mod arithmetic;
 mod nesting;
 mod timing;
 mod unfinished;
+mod unread;
 mod vendoring;
 mod walks;
 
 use std::collections::HashSet;
 
 use crate::bash::rig::{ExitStatus, Master};
-use crate::bashprof::{recorded, BashProf, Call, Profile, Recorded, Span};
+use crate::bashprof::{recorded, BashProf, Call, Profile, Recorded, Span, Unread};
 use crate::tests::scripts::{bash, Scripts};
 
 /// Run a script under the profiler. What comes back is the tree as recorded —

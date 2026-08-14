@@ -30,15 +30,24 @@ pub(super) struct Read {
     pub inside: Option<Id>,
 }
 
-/// Every call the run made, in the order they began.
-pub(super) fn records(heard: &[Line]) -> Result<Vec<Read>, Failure> {
+/// Every call the run made, in the order they began, and every message that
+/// would not read back.
+///
+/// A message set aside is a fault in the instrument. What the others said is
+/// no less true for it, so the pass carries on — and a call whose enclosing
+/// one was set aside falls out of the tree by itself, which is what the next
+/// pass counts.
+pub(super) fn records(heard: &[Line]) -> (Vec<Read>, Vec<Failure>) {
     let mut reading = Reading::default();
+    let mut unreadable = Vec::new();
 
     for line in heard {
-        reading.hear(line)?;
+        if let Err(why) = reading.hear(line) {
+            unreadable.push(why);
+        }
     }
 
-    reading.settled()
+    (reading.settled(), unreadable)
 }
 
 /// What an END carries back.
@@ -81,13 +90,17 @@ impl Reading {
 
     /// A name is given once: two calls under one name would close each
     /// other's spans and claim each other's children.
+    ///
+    /// Nothing is written before every check has passed, so a message set
+    /// aside leaves the reading as it found it.
     fn begin(&mut self, line: &Line, rest: &[String]) -> Result<(), Failure> {
         let (call, inside) = began(line, rest)?;
 
-        if self.at.insert(call.id.clone(), self.opened.len()).is_some() {
+        if self.at.contains_key(&call.id) {
             return Err(reading(format!("a second call named {}", call.id)));
         }
 
+        self.at.insert(call.id.clone(), self.opened.len());
         self.opened.push(Open { call, inside, closed: None });
         Ok(())
     }
@@ -111,19 +124,9 @@ impl Reading {
         Ok(())
     }
 
-    /// The calls as records, oldest first — once every name they point at is
-    /// one that was given.
-    fn settled(self) -> Result<Vec<Read>, Failure> {
-        let Reading { opened, at } = self;
-
-        let named_but_absent = opened
-            .iter()
-            .filter_map(|open| open.inside.as_ref().map(|inside| (&open.call.id, inside)))
-            .find(|(_, inside)| !at.contains_key(inside));
-
-        if let Some((call, missing)) = named_but_absent {
-            return Err(reading(format!("{call} was made inside {missing}, which never began")));
-        }
+    /// The calls as records, oldest first.
+    fn settled(self) -> Vec<Read> {
+        let Reading { opened, .. } = self;
 
         let mut records: Vec<Read> = opened
             .into_iter()
@@ -140,7 +143,7 @@ impl Reading {
 
         records
             .sort_by_key(|read| (read.record.call().sent.sent_at, read.record.call().sent.pid.0));
-        Ok(records)
+        records
     }
 }
 
