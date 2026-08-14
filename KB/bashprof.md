@@ -44,8 +44,8 @@ Each type wraps the one before it and adds what its own message carried.
 Nothing is restated, so nothing can disagree.
 
 ```rust
-/// The provenance the protocol puts in front of every message.
-pub struct Sent { pid, parent, shlvl, seq, sent_at, heard_at }
+/// When one message was written and when it arrived.
+pub struct Sent { nth, seq, sent_at, heard_at }
 
 /// A call that began: everything its BEGIN reported.
 pub struct Call {
@@ -53,6 +53,7 @@ pub struct Call {
     pub label: String,
     pub argv: Vec<String>,      // the command being measured
     pub stack: Stack,
+    pub shell: Arc<Shell>,      // the shell the walk above was taken in
     pub sent: Sent,
 }
 
@@ -188,8 +189,11 @@ where the names are read.
 | `nesting` | those → a forest, the names spent | one index, then `Treeish` + `vec_fold` |
 | `profile` | that forest → timings | one `vec_fold` |
 
-The session is `Vec<Line>`; `hear` keeps. Nothing is grouped by shell, nothing
-is paired by position, and nothing depends on the order messages arrived in.
+The reaction is `Vec<Line>`, the shipped one — bashprof adds nothing to it, and
+its rig is `bash` and `joined` alone. `recorded()` takes `&[Said]`, which is
+what [`heard`](rig.md#what-a-run-hands-back) makes of the per-shell foldings: a
+message and the shell that sent it, since a walk cannot be read without one.
+Nothing is paired by position and nothing depends on the order they arrived in.
 
 `recorded()` is the whole reading and the only entry point; what passes between
 the passes is nobody else's. **The enclosing name does not reach the tree.** It
@@ -276,5 +280,5 @@ duration.
 
 - [scoping.md](scoping.md) — the frame `__BP_inside` is declared in, and why
 - [stack.md](stack.md) — the frame walk both instruments share
-- [wire.md](wire.md#the-message) — the provenance every message carries already
-- [rig.md](rig.md#what-a-session-is-for) — the session this one keeps
+- [wire.md](wire.md#messages) — the provenance every message carries already
+- [rig.md](rig.md#what-a-reaction-is-for) — the reaction this one keeps
