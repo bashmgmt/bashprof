@@ -16,23 +16,23 @@ convention:
 
 ```
 bashprof run   [--reach bash-env|by-hand] --into FILE [--output …] -- <command…>
-bashprof serve --into FILE [--output …]
+bashprof serve --at DIR --into FILE [--output …]
 ```
 
 | | who starts the shells | how they are reached | its exit code |
 |---|---|---|---|
 | `run` | the tool, from the command line it was given | `BC_SESSION` in the environment always; `--reach bash-env` (the default) also `BASH_ENV`, so the whole process tree joins; `--reach by-hand` leaves it to the scripts | the subject's |
-| `serve` | a bash script, which started this process as a coprocess | the address, written on stdout for the client to source | its own: 0, or 1 if the reading did not come out |
+| `serve` | a bash script, which named the workspace (`--at`, required) and started this process as a coprocess | its own choice — the address is `<at>/session.bash`; the line on stdout says the session is laid | its own: 0, or 1 if the reading did not come out |
 
 `serve` is the shipped half of what `assets/joining.bash` starts —
-`BC_START bashprof serve --into build.times`. Nothing about the reading changes
+`BC_START bashprof serve --at prof.d --into build.times`. Nothing about the reading changes
 between the two, and `__fixtures/joined/build.bash` runs under both plus under
 no server at all, which is the vendoring contract end to end
 ([tests/cli.rs](../../../tests/cli.rs)). `run --help` and `serve --help` end
 with `JOINING`, every way a script joins.
 
 ```rust
-pub struct BashProf { pub reaching: Reaching }
+pub struct BashProf;   // drive it as Reached { rig: BashProf, reaching }, or serve it
 ```
 
 `--output` chooses **how far the run is read**, and in what:
