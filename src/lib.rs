@@ -8,12 +8,12 @@
 //! on the wire rather than being reconstructed from it.
 //!
 //! ```no_run
-//! use mb_resolver::bash::rig::{heard, Driving};
+//! use mb_resolver::bash::rig::{heard, Driving, Reaching};
 //! use mb_resolver::bashprof::{recorded, BashProf, Profile};
 //!
 //! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() -> Result<(), mb_resolver::bash::rig::Failure> {
-//! let ran = BashProf.run(&["bash", "build.bash"]).await?;
+//! let ran = BashProf { reaching: Reaching::BashEnv }.run(&["bash", "build.bash"]).await?;
 //!
 //! // Two readings, and each hands back what it did read when it refuses.
 //! let forest = recorded(&heard(&ran.shells)).unwrap_or_else(|unread| unread.resolved);
@@ -37,10 +37,11 @@
 pub(crate) mod reading;
 pub(crate) mod record;
 
+use std::ffi::OsString;
 use std::sync::Arc;
 
 use crate::bash::rig::{
-    Driving, Failure, Layout, Message, Rig, Serving, Setup, Shell, Workspace,
+    Driving, Failure, Layout, Message, Reaching, Rig, Serving, Setup, Shell, Workspace,
 };
 use crate::bash::stack;
 
@@ -72,7 +73,10 @@ mod tests;
 /// Every message carries the name of the call it belongs to, so the tree is on
 /// the wire and there is nothing to keep up as they arrive — the reaction is
 /// the one that keeps every message.
-pub struct BashProf;
+pub struct BashProf {
+    /// How a driven subject's shells find the instrument.
+    pub reaching: Reaching,
+}
 
 impl Rig for BashProf {
     type Reaction = Vec<Message>;
@@ -88,5 +92,10 @@ impl Rig for BashProf {
 
 /// Either orchestration. A measurement is an interval between two messages, so
 /// nothing in the reading depends on who started the shells that sent them.
-impl Driving for BashProf {}
+impl Driving for BashProf {
+    fn environment(&self, at: &Layout) -> Vec<(OsString, OsString)> {
+        self.reaching.environment(at)
+    }
+}
+
 impl Serving for BashProf {}
