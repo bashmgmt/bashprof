@@ -54,6 +54,12 @@ enum What {
     Serve {
         #[command(flatten)]
         reading: Reading,
+
+        /// The workspace the session is laid in — the client's choice, so the
+        /// client knows the address, AT/session.bash, before this runs.
+        /// Created if missing, left behind.
+        #[arg(long)]
+        at: PathBuf,
     },
 }
 
@@ -149,7 +155,7 @@ async fn main() {
 async fn perform(what: &What) -> i32 {
     match what {
         What::Run { reading, reach, argv } => run(reading, *reach, argv).await,
-        What::Serve { reading } => match serve(reading).await {
+        What::Serve { reading, at } => match serve(reading, at).await {
             Ok(()) => 0,
             Err(why) => {
                 eprintln!("bashprof: {why}");
@@ -193,10 +199,10 @@ async fn run(reading: &Reading, reaching: Reaching, argv: &[String]) -> i32 {
 /// hand back — only whether the reading came out whole. The client's `BC_LEAVE`
 /// waits for this process, so that status is what its own `set -e` sees. What
 /// the address reaches is the client's: `Serving` reads no `Reaching`.
-async fn serve(reading: &Reading) -> Result<(), Failure> {
+async fn serve(reading: &Reading, at: &std::path::Path) -> Result<(), Failure> {
     reading.claim()?;
 
-    let served = BashProf { reaching: Reaching::ByHand }.serve_coprocess().await?;
+    let served = BashProf { reaching: Reaching::ByHand }.serve_coprocess(at).await?;
 
     reading.keep(&served.shells)?;
     served.failed.map_or(Ok(()), Err)

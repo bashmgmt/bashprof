@@ -18,7 +18,8 @@ declare -F __bp_begin >/dev/null || { __bp_begin() { :; }; __bp_end() { :; }; }
 
 if (( $# > 0 )); then
     source "$__root/assets/joining.bash"
-    BC_START "$@"
+    __workspace="$(mktemp -d)"
+    BC_START "$@" --at "$__workspace"
 fi
 
 compile() { sleep 0.01; BASHPROF_TIMETHIS link link; }
@@ -34,7 +35,9 @@ BASHPROF_TIMETHIS build build
 echo built
 
 # `wait` is what says the reading is written: the server does its reading after
-# the last shell has let go, and this is the client letting go.
+# the last shell has let go, and this is the client letting go. The workspace
+# was this script's to name, so it is this script's to remove.
 if (( $# > 0 )); then
     BC_LEAVE
+    rm -rf "$__workspace"
 fi

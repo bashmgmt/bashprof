@@ -41,7 +41,7 @@ use std::ffi::OsString;
 use std::sync::Arc;
 
 use crate::bash::rig::{
-    Driving, Failure, Layout, Message, Reaching, Rig, Serving, Setup, Shell, Workspace,
+    Driving, Failure, Layout, Message, Reaching, Rig, Serving, Setup, Shell,
 };
 use crate::bash::stack;
 
@@ -53,13 +53,14 @@ pub(crate) const WORDS: &str = include_str!("../../assets/bashprof.bash");
 /// `__bp_begin` and `__bp_end`, which are what make that word measure.
 pub(crate) const EFFECT: &str = include_str!("effect.bash");
 
-/// The label bashprof's word speaks under.
-const JOIN: &str = "BC_JOIN BASHPROF\n";
+/// The label bashprof's word speaks under: what a rig reusing
+/// [`instrument`] joins.
+pub const LABEL: &str = "BASHPROF";
 
 /// The bash a rig hands the subject, for any rig that wants what bashprof
 /// measures. The frame walk comes with it, since a measurement reports one.
 pub fn instrument() -> String {
-    stack::with_walk(&[WORDS, EFFECT, JOIN])
+    stack::with_walk(&[WORDS, EFFECT])
 }
 
 pub use reading::{recorded, Profile, Recorded, Span, Unfinished, Unread};
@@ -82,7 +83,7 @@ impl Rig for BashProf {
     type Reaction = Vec<Message>;
 
     fn setup(&self) -> Setup {
-        Setup { bash: instrument(), workspace: Workspace::Temporary }
+        Setup { label: LABEL.to_string(), bash: instrument() }
     }
 
     async fn joined(&self, _at: &Layout, _shell: Arc<Shell>) -> Result<Vec<Message>, Failure> {
