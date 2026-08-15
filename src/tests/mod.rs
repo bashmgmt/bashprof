@@ -20,7 +20,7 @@ mod walks;
 
 use std::collections::HashSet;
 
-use crate::bash::rig::{heard, Driving, ExitStatus};
+use crate::bash::rig::{heard, Driving, ExitStatus, Reaching};
 use crate::bashprof::{recorded, BashProf, Call, Profile, Recorded, Span, Unread};
 use crate::tests::scripts::{bash, Scripts};
 
@@ -29,7 +29,7 @@ use crate::tests::scripts::{bash, Scripts};
 /// which is what each test below does next.
 async fn profiled(script: &str) -> (Vec<Recorded>, ExitStatus) {
     let scripts = Scripts::of(&[("subject.bash", script)]);
-    let ran = BashProf.run(&bash(scripts.at("subject.bash"))).await.unwrap().whole().unwrap();
+    let ran = BashProf { reaching: Reaching::BashEnv }.run(&bash(scripts.at("subject.bash"))).await.unwrap().whole().unwrap();
 
     (recorded(&heard(&ran.shells)).expect("the instrument's own messages"), ran.subject)
 }

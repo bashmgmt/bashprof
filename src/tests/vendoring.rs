@@ -3,7 +3,7 @@
 
 use std::process::Command;
 
-use crate::bash::rig::{heard, Driving, ExitStatus};
+use crate::bash::rig::{heard, Driving, ExitStatus, Reaching};
 use crate::bash;
 use crate::bashprof::{recorded, BashProf, Profile, WORDS};
 use crate::tests::scripts::{bash, Scripts};
@@ -55,7 +55,7 @@ fn the_vendored_word_runs_an_instrumented_script_unprofiled() {
 #[tokio::test]
 async fn the_guard_leaves_the_real_hooks_in_place_under_the_tool() {
     let scripts = vendoring();
-    let ran = BashProf.run(&bash(scripts.at("build.bash"))).await.unwrap().whole().unwrap();
+    let ran = BashProf { reaching: Reaching::BashEnv }.run(&bash(scripts.at("build.bash"))).await.unwrap().whole().unwrap();
 
     assert_eq!(ran.subject, ExitStatus::Code(0));
 

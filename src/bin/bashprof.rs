@@ -1,17 +1,20 @@
 //! Time a tree of calls in a bash program, and write what its measured calls
 //! recorded.
 //!
-//! Two ways in, and they differ only in who started the shells. `run_bash_env`
-//! starts a command line and reaches its whole process tree through
-//! `BASH_ENV`; `serve` is started *by* a bash script and hands that script the
-//! address to join. A span is the interval between two messages either way —
-//! which is why both take the same options, from the same type.
+//! Two ways in, and they differ only in who started the shells. `run` starts
+//! a command line, exports the session's address into it and — unless told
+//! otherwise — `BASH_ENV`, so its whole process tree joins; `serve` is started
+//! *by* a bash script and hands that script the address to join. A span is
+//! the interval between two messages either way — which is why both take the
+//! same options, from the same type.
 
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use mb_resolver::bash::rig::{heard, Attended, Doing, Driving, Failure, Message, Said, Serving};
+use mb_resolver::bash::rig::{
+    heard, Attended, Doing, Driving, Failure, Message, Reaching, Said, Serving, JOINING,
+};
 use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
 
 #[derive(Parser)]
@@ -23,12 +26,18 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum What {
-    /// Profile a command line, reaching every shell it starts through
-    /// BASH_ENV.
-    #[command(name = "run_bash_env")]
-    RunBashEnv {
+    /// Profile a command line. Every shell finds the session's address in
+    /// BC_SESSION; --reach says whether it has already joined.
+    #[command(after_long_help = JOINING)]
+    Run {
         #[command(flatten)]
         reading: Reading,
+
+        /// How the shells find the instrument: bash-env has every
+        /// non-interactive bash in the tree join as it starts; by-hand leaves
+        /// it to the scripts, which join with `source "$BC_SESSION"`.
+        #[arg(long, value_enum, default_value_t = Reaching::BashEnv)]
+        reach: Reaching,
 
         /// The wrapped command, program included — `bash build.bash`, or
         /// `make test`, whose own shells join too. Everything from the first
@@ -41,6 +50,7 @@ enum What {
     /// Profile for a bash script that started this process as a coprocess: it
     /// holds this process's standard input, and reads the address to join from
     /// its standard output.
+    #[command(after_long_help = JOINING)]
     Serve {
         #[command(flatten)]
         reading: Reading,
@@ -138,7 +148,7 @@ async fn main() {
 
 async fn perform(what: &What) -> i32 {
     match what {
-        What::RunBashEnv { reading, argv } => run(reading, argv).await,
+        What::Run { reading, reach, argv } => run(reading, *reach, argv).await,
         What::Serve { reading } => match serve(reading).await {
             Ok(()) => 0,
             Err(why) => {
@@ -153,13 +163,14 @@ async fn perform(what: &What) -> i32 {
 /// is indistinguishable from an unprofiled one. Where the subject succeeded
 /// and bashprof could not write what was asked for, the failure is bashprof's
 /// and so is the status.
-async fn run(reading: &Reading, argv: &[String]) -> i32 {
+async fn run(reading: &Reading, reaching: Reaching, argv: &[String]) -> i32 {
     if let Err(why) = reading.claim() {
         eprintln!("bashprof: {why}");
         return 1;
     }
 
-    match BashProf.run(argv).await {
+    let bashprof = BashProf { reaching };
+    match bashprof.run(argv).await {
         Err(why) => {
             eprintln!("bashprof: {why}");
             1
@@ -180,11 +191,12 @@ async fn run(reading: &Reading, argv: &[String]) -> i32 {
 
 /// Nothing here starts a shell or ends one, so there is no subject's status to
 /// hand back — only whether the reading came out whole. The client's `BC_LEAVE`
-/// waits for this process, so that status is what its own `set -e` sees.
+/// waits for this process, so that status is what its own `set -e` sees. What
+/// the address reaches is the client's, so `reaching` is not read.
 async fn serve(reading: &Reading) -> Result<(), Failure> {
     reading.claim()?;
 
-    let served = BashProf.serve_coprocess().await?;
+    let served = BashProf { reaching: Reaching::ByHand }.serve_coprocess().await?;
 
     reading.keep(&served.shells)?;
     served.failed.map_or(Ok(()), Err)
