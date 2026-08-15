@@ -25,7 +25,7 @@ bashprof serve        --into FILE [--output …]
 | `serve` | a bash script, which started this process as a coprocess | the address, written on stdout for the client to run | its own: 0, or 1 if the reading did not come out |
 
 `serve` is the shipped half of what `assets/joining.bash` starts —
-`BC_JOIN bashprof serve --into build.times`. Nothing about the reading changes
+`BC_START bashprof serve --into build.times`. Nothing about the reading changes
 between the two, and `__fixtures/joined/build.bash` runs under both plus under
 no server at all, which is the vendoring contract end to end
 ([tests/cli.rs](../../../tests/cli.rs)).
@@ -60,8 +60,8 @@ Each type wraps the one before it and adds what its own message carried.
 Nothing is restated, so nothing can disagree.
 
 ```rust
-/// When one message was written and when it arrived.
-pub struct Stamp { nth, seq, sent_at, heard_at }
+/// When one message was written and when it was read.
+pub struct Stamp { sent_at, heard_at }
 
 /// A call that began: everything its BEGIN reported.
 pub struct Call {
