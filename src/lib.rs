@@ -8,12 +8,12 @@
 //! on the wire rather than being reconstructed from it.
 //!
 //! ```no_run
-//! use mb_resolver::bash::rig::{heard, Driving, Reaching};
+//! use mb_resolver::bash::rig::{heard, Driving, Reached, Reaching};
 //! use mb_resolver::bashprof::{recorded, BashProf, Profile};
 //!
 //! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() -> Result<(), mb_resolver::bash::rig::Failure> {
-//! let ran = BashProf { reaching: Reaching::BashEnv }.run(&["bash", "build.bash"]).await?;
+//! let ran = Reached { rig: BashProf, reaching: Reaching::BashEnv }.run(&["bash", "build.bash"]).await?;
 //!
 //! // Two readings, and each hands back what it did read when it refuses.
 //! let forest = recorded(&heard(&ran.shells)).unwrap_or_else(|unread| unread.resolved);
@@ -37,12 +37,9 @@
 pub(crate) mod reading;
 pub(crate) mod record;
 
-use std::ffi::OsString;
 use std::sync::Arc;
 
-use crate::bash::rig::{
-    Driving, Failure, Layout, Message, Reaching, Rig, Serving, Setup, Shell,
-};
+use crate::bash::rig::{Failure, Layout, Message, Rig, Serving, Setup, Shell};
 use crate::bash::stack;
 
 /// `BASHPROF_TIMETHIS`, the word a call site says. Shipped as an asset so a
@@ -74,10 +71,7 @@ mod tests;
 /// Every message carries the name of the call it belongs to, so the tree is on
 /// the wire and there is nothing to keep up as they arrive — the reaction is
 /// the one that keeps every message.
-pub struct BashProf {
-    /// How a driven subject's shells find the instrument.
-    pub reaching: Reaching,
-}
+pub struct BashProf;
 
 impl Rig for BashProf {
     type Reaction = Vec<Message>;
@@ -91,12 +85,7 @@ impl Rig for BashProf {
     }
 }
 
-/// Either orchestration. A measurement is an interval between two messages, so
-/// nothing in the reading depends on who started the shells that sent them.
-impl Driving for BashProf {
-    fn environment(&self, at: &Layout) -> Vec<(OsString, OsString)> {
-        self.reaching.environment(at)
-    }
-}
-
+/// A measurement is an interval between two messages, so nothing in the
+/// reading depends on who started the shells that sent them: serve it, or
+/// drive it as [`Reached`](crate::bash::rig::Reached).
 impl Serving for BashProf {}

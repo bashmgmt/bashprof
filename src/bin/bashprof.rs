@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use mb_resolver::bash::rig::{
-    heard, Attended, Doing, Driving, Failure, Message, Reaching, Said, Serving, JOINING,
+    heard, Attended, Doing, Driving, Failure, Message, Reached, Reaching, Said, Serving, JOINING,
 };
 use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
 
@@ -175,8 +175,8 @@ async fn run(reading: &Reading, reaching: Reaching, argv: &[String]) -> i32 {
         return 1;
     }
 
-    let bashprof = BashProf { reaching };
-    match bashprof.run(argv).await {
+    let reached = Reached { rig: BashProf, reaching };
+    match reached.run(argv).await {
         Err(why) => {
             eprintln!("bashprof: {why}");
             1
@@ -197,12 +197,11 @@ async fn run(reading: &Reading, reaching: Reaching, argv: &[String]) -> i32 {
 
 /// Nothing here starts a shell or ends one, so there is no subject's status to
 /// hand back — only whether the reading came out whole. The client's `BC_LEAVE`
-/// waits for this process, so that status is what its own `set -e` sees. What
-/// the address reaches is the client's: `Serving` reads no `Reaching`.
+/// waits for this process, so that status is what its own `set -e` sees.
 async fn serve(reading: &Reading, at: &std::path::Path) -> Result<(), Failure> {
     reading.claim()?;
 
-    let served = BashProf { reaching: Reaching::ByHand }.serve_coprocess(at).await?;
+    let served = BashProf.serve_coprocess(at).await?;
 
     reading.keep(&served.shells)?;
     served.failed.map_or(Ok(()), Err)
