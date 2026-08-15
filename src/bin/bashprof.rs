@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use mb_resolver::bash::rig::{heard, Attended, Doing, Failure, Line, Master, Said, Slave};
+use mb_resolver::bash::rig::{heard, Attended, Doing, Driving, Failure, Message, Said, Serving};
 use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
 
 #[derive(Parser)]
@@ -63,7 +63,7 @@ struct Reading {
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
 enum Output {
-    /// The measured tree, indented, one call per line.
+    /// The measured tree, indented, one call per message.
     Human,
 
     /// The same tree as a JSON array of root spans.
@@ -91,7 +91,7 @@ impl Reading {
     }
 
     /// What the shells said, read as far as this asks for, and written.
-    fn keep(&self, shells: &[Attended<Vec<Line>>]) -> Result<(), Failure> {
+    fn keep(&self, shells: &[Attended<Vec<Message>>]) -> Result<(), Failure> {
         let text = self.written(&heard(shells))?;
 
         self.write(text + "\n")

@@ -61,7 +61,7 @@ Nothing is restated, so nothing can disagree.
 
 ```rust
 /// When one message was written and when it arrived.
-pub struct Sent { nth, seq, sent_at, heard_at }
+pub struct Stamp { nth, seq, sent_at, heard_at }
 
 /// A call that began: everything its BEGIN reported.
 pub struct Call {
@@ -70,7 +70,7 @@ pub struct Call {
     pub argv: Vec<String>,      // the command being measured
     pub stack: Stack,
     pub shell: Arc<Shell>,      // the shell the walk above was taken in
-    pub sent: Sent,
+    pub stamp: Stamp,
 }
 
 /// A call that also ended: what its END carried back.
@@ -152,7 +152,7 @@ with that frame:
 ```bash
 measure_step() {
     local __BASHPROF_STACK_SHIFT=1
-    BASHPROF_TIME_CPS "$@"
+    BASHPROF_TIMETHIS "$@"
 }
 ```
 
@@ -206,7 +206,7 @@ where the names are read.
 | `nesting` | those → a forest, the names spent | one index, then `Treeish` + `vec_fold` |
 | `profile` | that forest → timings | one `vec_fold` |
 
-The reaction is `Vec<Line>`, the shipped one — bashprof adds nothing to it, and
+The reaction is `Vec<Message>`, the shipped one — bashprof adds nothing to it, and
 its rig is `bash` and `joined` alone. `recorded()` takes `&[Said]`, which is
 what [`heard`](rig.md#what-a-run-hands-back) makes of the per-shell foldings: a
 message and the shell that sent it, since a walk cannot be read without one.
@@ -256,10 +256,10 @@ not a node.
 outward, with one frame of the instrument's per enclosing measurement:
 
 ```
-inner   mid@build.bash:2  between@build.bash:3  BASHPROF_TIME_CPS  main@build.bash:5
+inner   mid@build.bash:2  between@build.bash:3  BASHPROF_TIMETHIS  main@build.bash:5
 ```
 
-`between` is on that walk and nowhere in the tree. `Stack::at` is the call
+`between` is on that walk and nowhere in the tree. `Stack::top` is the call
 site, which is what tells two calls made from one function apart, and what
 `human` prints. At one frame per level a walk 100 deep is a 17 kB payload in
 five frames — see

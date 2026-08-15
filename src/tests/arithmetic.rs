@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use crate::bash::rig::{Micros, Sent};
+use crate::bash::rig::{Micros, Stamp};
 use crate::bash::stack::{Frame, Site, Source, Stack};
 use crate::tests::accounts;
 
@@ -23,7 +23,7 @@ fn call(label: &str, began: u64) -> Call {
         }])
         .unwrap(),
         shell: accounts::reading("/x.bash"),
-        sent: Sent { nth: began, seq: 0, sent_at: Micros(began), heard_at: Micros(began) },
+        stamp: Stamp { nth: began, seq: 0, sent_at: Micros(began), heard_at: Micros(began) },
     }
 }
 

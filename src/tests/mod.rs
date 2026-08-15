@@ -20,7 +20,7 @@ mod walks;
 
 use std::collections::HashSet;
 
-use crate::bash::rig::{heard, ExitStatus, Master};
+use crate::bash::rig::{heard, Driving, ExitStatus};
 use crate::bashprof::{recorded, BashProf, Call, Profile, Recorded, Span, Unread};
 use crate::tests::scripts::{bash, Scripts};
 
@@ -62,15 +62,15 @@ const TREE: &str = r#"
 
     f__A() {
         pause 0.02
-        BASHPROF_TIME_CPS b f__B
+        BASHPROF_TIMETHIS b f__B
         pause 0.02
-        BASHPROF_TIME_CPS e f__E
+        BASHPROF_TIMETHIS e f__E
     }
 
     f__B() {
-        BASHPROF_TIME_CPS c f__C
+        BASHPROF_TIMETHIS c f__C
         pause 0.01
-        BASHPROF_TIME_CPS d f__D
+        BASHPROF_TIMETHIS d f__D
     }
 
     f__C() { pause 0.03; }
@@ -78,12 +78,12 @@ const TREE: &str = r#"
 
     f__E() {
         pause 0.01
-        BASHPROF_TIME_CPS f f__F
+        BASHPROF_TIMETHIS f f__F
     }
 
     f__F() { pause 0.05; }
 
-    BASHPROF_TIME_CPS a f__A
+    BASHPROF_TIMETHIS a f__A
     "#;
 
 /// A call that completes inside one the shell then dies in.
@@ -91,9 +91,9 @@ const NESTED: &str = r#"
     set -e
 
     f__inner() { :; }
-    f__outer() { BASHPROF_TIME_CPS inner f__inner; false; }
+    f__outer() { BASHPROF_TIMETHIS inner f__inner; false; }
 
-    BASHPROF_TIME_CPS outer f__outer
+    BASHPROF_TIMETHIS outer f__outer
     "#;
 
 

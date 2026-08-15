@@ -22,9 +22,9 @@ fn read(script: &str) -> Result<Vec<Recorded>, Unread> {
 fn a_message_that_will_not_read_leaves_the_rest_standing() {
     let unread = read(
         r#"
-        BASHPROF_TIME_CPS before true
-        BC_INSTR say TIME_CPS BEGIN id 1.99 inside "" label mangled
-        BASHPROF_TIME_CPS after true
+        BASHPROF_TIMETHIS before true
+        BC_INSTR say TIMETHIS BEGIN id 1.99 inside "" label mangled
+        BASHPROF_TIMETHIS after true
         "#,
     )
     .expect_err("the mangled BEGIN");
@@ -33,8 +33,8 @@ fn a_message_that_will_not_read_leaves_the_rest_standing() {
         unread.resolved.iter().map(|node| node.record.call().label.as_str()).collect();
 
     assert_eq!(labels, ["before", "after"], "{unread}");
-    assert_eq!(unread.unreadable().len(), 1);
-    assert!(unread.unreadable()[0].to_string().contains("argv"), "{unread}");
+    assert_eq!(unread.unreadable.len(), 1);
+    assert!(unread.unreadable[0].to_string().contains("argv"), "{unread}");
 }
 
 /// A call made inside one that never began is unreachable from any root, so
@@ -47,10 +47,10 @@ fn a_call_whose_enclosing_one_never_began_is_dropped_and_counted() {
         GHOST() {
             local -a __w=()
             __bc_stack __w 2
-            BC_INSTR say TIME_CPS BEGIN id 1.99 inside nobody label ghost argv "()" "${__w[@]}"
+            BC_INSTR say TIMETHIS BEGIN id 1.99 inside nobody label ghost argv "()" "${__w[@]}"
         }
 
-        BASHPROF_TIME_CPS kept true
+        BASHPROF_TIMETHIS kept true
         GHOST
         "#,
     )
@@ -60,13 +60,13 @@ fn a_call_whose_enclosing_one_never_began_is_dropped_and_counted() {
         unread.resolved.iter().map(|node| node.record.call().label.as_str()).collect();
 
     assert_eq!(labels, ["kept"], "{unread}");
-    assert_eq!(unread.unreadable().len(), 1);
-    assert!(unread.unreadable()[0].to_string().contains("1 calls"), "{unread}");
+    assert_eq!(unread.unreadable.len(), 1);
+    assert!(unread.unreadable[0].to_string().contains("1 calls"), "{unread}");
 }
 
 /// A run with nothing wrong in it says so by reading whole, which is what
 /// every other test in this module relies on.
 #[test]
 fn a_sound_run_reads_without_a_word() {
-    assert!(read("BASHPROF_TIME_CPS only true\n").is_ok());
+    assert!(read("BASHPROF_TIMETHIS only true\n").is_ok());
 }

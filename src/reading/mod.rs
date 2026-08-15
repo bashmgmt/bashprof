@@ -2,8 +2,8 @@
 //!
 //! | | | |
 //! |---|---|---|
-//! | [`flat`] | messages → records, each with the name it was told encloses it | one pass, one map from name to call |
-//! | [`tree`] | those → a forest, the names spent | one index, then `Treeish` + `vec_fold` |
+//! | [`records`] | messages → records, each with the name it was told encloses it | one pass, one map from name to call |
+//! | [`nesting`] | those → a forest, the names spent | one index, then `Treeish` + `vec_fold` |
 //! | [`timings`] | that forest → measurements | one `vec_fold` |
 //!
 //! [`recorded`] is the whole of it and the only way in; what passes between
@@ -14,17 +14,17 @@
 //! where a message this instrument wrote would not read back, [`Unfinished`]
 //! where a shell died inside a call it had begun.
 
-mod flat;
+mod nesting;
+mod records;
 mod show;
 mod timings;
-mod tree;
 
 use std::fmt;
 
 use crate::bash::rig::{Failure, Said};
 
 pub use timings::{Profile, Span, Unfinished};
-pub use tree::Recorded;
+pub use nesting::Recorded;
 
 /// What a run recorded, as the tree its calls made: every call that began,
 /// whether or not it ended.
@@ -32,9 +32,9 @@ pub use tree::Recorded;
 /// Reading that as measurements is [`Profile::of`], and the caller's — a test
 /// bails on a run that died mid-call, a tool reporting what it has need not.
 pub fn recorded(heard: &[Said<'_>]) -> Result<Vec<Recorded>, Unread> {
-    let (records, mut unreadable) = flat::records(heard);
+    let (records, mut unreadable) = records::records(heard);
     let read = records.len();
-    let resolved = tree::nest(records);
+    let resolved = nesting::nest(records);
 
     // A call whose enclosing one was set aside is unreachable from any root, so
     // nesting drops it. The forest's own size is where that shows, and nothing
@@ -68,13 +68,7 @@ fn nested(forest: &[Recorded]) -> usize {
 #[derive(Debug)]
 pub struct Unread {
     pub resolved: Vec<Recorded>,
-    unreadable: Vec<Failure>,
-}
-
-impl Unread {
-    pub fn unreadable(&self) -> &[Failure] {
-        &self.unreadable
-    }
+    pub unreadable: Vec<Failure>,
 }
 
 impl fmt::Display for Unread {

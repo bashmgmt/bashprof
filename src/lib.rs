@@ -1,5 +1,5 @@
 //! bashprof: time a tree of calls in a bash program, wherever the program
-//! wraps one in `BASHPROF_TIME_CPS`.
+//! wraps one in `BASHPROF_TIMETHIS`.
 //!
 //! Nothing is timed in bash. The wire stamps every message with the sending
 //! shell's `$EPOCHREALTIME`, so a span is the interval between two of them.
@@ -8,7 +8,7 @@
 //! on the wire rather than being reconstructed from it.
 //!
 //! ```no_run
-//! use mb_resolver::bash::rig::{heard, Master};
+//! use mb_resolver::bash::rig::{heard, Driving};
 //! use mb_resolver::bashprof::{recorded, BashProf, Profile};
 //!
 //! let ran = BashProf.run(&["bash", "build.bash"])?;
@@ -36,10 +36,10 @@ pub(crate) mod record;
 
 use std::sync::Arc;
 
-use crate::bash::rig::{Failure, Laid, Line, Master, Rig, Shell, Slave};
+use crate::bash::rig::{Driving, Failure, Layout, Message, Rig, Serving, Shell, Workspace};
 use crate::bash::stack;
 
-/// `BASHPROF_TIME_CPS`, the word a call site says. Shipped as an asset so a
+/// `BASHPROF_TIMETHIS`, the word a call site says. Shipped as an asset so a
 /// client's copy and the injected one are the same bytes, and naming nothing
 /// of the protocol.
 pub(crate) const WORDS: &str = include_str!("../../assets/bashprof.bash");
@@ -50,7 +50,7 @@ pub(crate) const EFFECT: &str = include_str!("effect.bash");
 /// The bash a rig hands the subject, for any rig that wants what bashprof
 /// measures. The frame walk comes with it, since a measurement reports one.
 pub fn instrument() -> String {
-    stack::with(&[WORDS, EFFECT])
+    stack::with_walk(&[WORDS, EFFECT])
 }
 
 pub use reading::{recorded, Profile, Recorded, Span, Unfinished, Unread};
@@ -67,18 +67,22 @@ mod tests;
 pub struct BashProf;
 
 impl Rig for BashProf {
-    type Attending = Vec<Line>;
+    type Reaction = Vec<Message>;
 
     fn bash(&self) -> String {
         instrument()
     }
 
-    fn joined(&self, _at: &Laid, _shell: Arc<Shell>) -> Result<Vec<Line>, Failure> {
+    fn workspace(&self) -> Workspace {
+        Workspace::Temporary
+    }
+
+    fn joined(&self, _at: &Layout, _shell: Arc<Shell>) -> Result<Vec<Message>, Failure> {
         Ok(Vec::new())
     }
 }
 
 /// Either orchestration. A measurement is an interval between two messages, so
 /// nothing in the reading depends on who started the shells that sent them.
-impl Master for BashProf {}
-impl Slave for BashProf {}
+impl Driving for BashProf {}
+impl Serving for BashProf {}

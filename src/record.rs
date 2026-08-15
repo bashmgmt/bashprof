@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::bash::rig::{Micros, Sent, Shell};
+use crate::bash::rig::{Micros, Shell, Stamp};
 use crate::bash::stack::Stack;
 
 /// The name a shell gave one of its calls: `$BASHPID` and a count only that
@@ -46,7 +46,7 @@ pub struct Call {
     pub shell: Arc<Shell>,
 
     /// When it said so.
-    pub sent: Sent,
+    pub stamp: Stamp,
 }
 
 /// A call that also ended: what it began as, and the two things its END
@@ -65,7 +65,7 @@ pub struct Complete {
 impl Complete {
     /// BEGIN to END: this call's own work and everything inside it.
     pub fn took(&self) -> u64 {
-        self.ended_at.0 - self.call.sent.sent_at.0
+        self.ended_at.0 - self.call.stamp.sent_at.0
     }
 }
 

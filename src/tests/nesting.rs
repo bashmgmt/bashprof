@@ -28,10 +28,10 @@ fn a_call_measured_in_a_subshell_nests_where_it_was_made() {
     let (recorded, status) = profiled(
         r#"
         f__A() {
-            BASHPROF_TIME_CPS plain true
-            ( BASHPROF_TIME_CPS forked true )
+            BASHPROF_TIMETHIS plain true
+            ( BASHPROF_TIMETHIS forked true )
         }
-        BASHPROF_TIME_CPS a f__A
+        BASHPROF_TIMETHIS a f__A
         "#,
     );
 
@@ -52,18 +52,18 @@ fn concurrent_forks_of_one_line_keep_their_own_calls() {
         r#"
         f__work() {
             sleep "$1"
-            BASHPROF_TIME_CPS inner true
+            BASHPROF_TIMETHIS inner true
             sleep 0.1
         }
 
         f__A() {
             for delay in 0.05 0.01; do
-                ( BASHPROF_TIME_CPS turn f__work "$delay" ) &
+                ( BASHPROF_TIMETHIS turn f__work "$delay" ) &
             done
             wait
         }
 
-        BASHPROF_TIME_CPS a f__A
+        BASHPROF_TIMETHIS a f__A
         "#,
     );
 
@@ -93,12 +93,12 @@ fn a_name_is_inherited_through_two_levels_of_forking() {
         r#"
         f__A() {
             (
-                BASHPROF_TIME_CPS middle true
-                ( BASHPROF_TIME_CPS deep true )
+                BASHPROF_TIMETHIS middle true
+                ( BASHPROF_TIMETHIS deep true )
             )
         }
 
-        BASHPROF_TIME_CPS a f__A
+        BASHPROF_TIMETHIS a f__A
         "#,
     );
 

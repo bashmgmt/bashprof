@@ -16,7 +16,7 @@ use hylic::prelude::{treeish, vec_fold, VecHeap, FUSED};
 use serde::{Deserialize, Serialize};
 
 use crate::bashprof::record::{Call, Id, Record};
-use super::flat::Read;
+use super::records::Placed;
 use super::show;
 
 /// A call, and everything called inside it.
@@ -72,7 +72,7 @@ impl Recorded {
                 Record::Unended(_) => "NEVER ENDED".to_string(),
             };
 
-            format!("{} {took} at {} in pid {}", call.label, call.stack.at(), call.shell.pid)
+            format!("{} {took} at {} in pid {}", call.label, call.stack.top(), call.shell.pid)
         })
     }
 }
@@ -87,12 +87,12 @@ struct Nesting {
 }
 
 impl Nesting {
-    fn of(read: Vec<Read>) -> Self {
+    fn of(read: Vec<Placed>) -> Self {
         let mut inside: HashMap<Id, Vec<usize>> = HashMap::new();
         let mut roots = Vec::new();
         let mut records = Vec::with_capacity(read.len());
 
-        for (index, Read { record, inside: outer }) in read.into_iter().enumerate() {
+        for (index, Placed { record, inside: outer }) in read.into_iter().enumerate() {
             match outer {
                 Some(outer) => inside.entry(outer).or_default().push(index),
                 None => roots.push(index),
@@ -111,31 +111,31 @@ impl Nesting {
 
 /// One record, and the neighbourhood it takes to ask for its children.
 #[derive(Clone)]
-struct At {
+struct Node {
     index: usize,
     nesting: Arc<Nesting>,
 }
 
-impl At {
+impl Node {
     fn record(&self) -> &Record {
         &self.nesting.records[self.index]
     }
 
-    fn children(&self) -> Vec<At> {
+    fn children(&self) -> Vec<Node> {
         self.nesting
             .children(&self.record().call().id)
             .iter()
-            .map(|&index| At { index, nesting: self.nesting.clone() })
+            .map(|&index| Node { index, nesting: self.nesting.clone() })
             .collect()
     }
 }
 
-/// Read flat records as the forest their names describe. Past this point what
+/// Placed flat records as the forest their names describe. Past this point what
 /// a node is inside of is where it sits.
-pub(super) fn nest(read: Vec<Read>) -> Vec<Recorded> {
+pub(super) fn nest(read: Vec<Placed>) -> Vec<Recorded> {
     let nesting = Arc::new(Nesting::of(read));
-    let shape = treeish(At::children);
-    let build = vec_fold(|heap: &VecHeap<At, Recorded>| Recorded {
+    let shape = treeish(Node::children);
+    let build = vec_fold(|heap: &VecHeap<Node, Recorded>| Recorded {
         record: heap.node.record().clone(),
         children: Arc::from(heap.childresults.as_slice()),
     });
@@ -143,7 +143,7 @@ pub(super) fn nest(read: Vec<Read>) -> Vec<Recorded> {
     nesting
         .roots
         .iter()
-        .map(|&index| At { index, nesting: nesting.clone() })
+        .map(|&index| Node { index, nesting: nesting.clone() })
         .map(|root| FUSED.run(&build, &shape, &root))
         .collect()
 }

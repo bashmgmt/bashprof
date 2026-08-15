@@ -9,8 +9,8 @@ fn a_call_the_shell_died_inside_is_an_error_carrying_the_rest() {
         f__ok()   { :; }
         f__dies() { false; echo "RAN PAST ITS OWN FAILURE"; }
 
-        BASHPROF_TIME_CPS ok f__ok
-        BASHPROF_TIME_CPS doomed f__dies
+        BASHPROF_TIMETHIS ok f__ok
+        BASHPROF_TIMETHIS doomed f__dies
         echo "REACHED THE END"
         "#,
     );

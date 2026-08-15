@@ -12,7 +12,7 @@ use either::Either::{Left, Right};
 use hylic::prelude::{treeish, vec_fold, VecFold, VecHeap, FUSED};
 use serde::{Deserialize, Serialize};
 
-use super::tree::Recorded;
+use super::nesting::Recorded;
 use crate::bashprof::record::{Call, Complete, Record};
 use super::show;
 
@@ -61,7 +61,7 @@ impl Span {
     }
 
     fn window(&self) -> (u64, u64) {
-        (self.complete.call.sent.sent_at.0, self.complete.ended_at.0)
+        (self.complete.call.stamp.sent_at.0, self.complete.ended_at.0)
     }
 
     pub fn child(&self, label: &str) -> Option<&Span> {
@@ -93,7 +93,7 @@ impl fmt::Display for Profile {
                     call.label,
                     span.complete.took(),
                     span.exclusive(),
-                    call.stack.at(),
+                    call.stack.top(),
                     call.shell.pid
                 )
             },
@@ -132,17 +132,17 @@ impl std::error::Error for Unfinished<'_> {}
 
 /// What one subtree reads as: a measurement, or — some call in it never having
 /// ended — the measurements that survived it.
-type Reading = Result<Span, Vec<Span>>;
+type Measured = Result<Span, Vec<Span>>;
 
 /// These readings as spans, if every one of them is a measurement. `None` is
 /// the only record that something below never ended, and it is the `collect`
 /// that produces it.
-fn measured(readings: &[Reading]) -> Option<Vec<Span>> {
+fn measured(readings: &[Measured]) -> Option<Vec<Span>> {
     readings.iter().map(|reading| reading.as_ref().ok().cloned()).collect()
 }
 
 /// Every complete measurement in these readings, in the order they began.
-fn salvage(readings: &[Reading]) -> Vec<Span> {
+fn salvage(readings: &[Measured]) -> Vec<Span> {
     let mut spans: Vec<Span> = readings
         .iter()
         .flat_map(|reading| match reading {
@@ -151,7 +151,7 @@ fn salvage(readings: &[Reading]) -> Vec<Span> {
         })
         .collect();
 
-    spans.sort_by_key(|span| span.complete.call.sent.sent_at);
+    spans.sort_by_key(|span| span.complete.call.stamp.sent_at);
     spans
 }
 
@@ -159,8 +159,8 @@ fn salvage(readings: &[Reading]) -> Vec<Span> {
 /// its own duration is known, but its exclusive time would count work it
 /// cannot account for. The rule is the whole subtree or none of it, which is
 /// what pairing the node's own record with [`measured`] says.
-fn reading() -> VecFold<Recorded, Reading> {
-    vec_fold(|heap: &VecHeap<Recorded, Reading>| {
+fn measuring() -> VecFold<Recorded, Measured> {
+    vec_fold(|heap: &VecHeap<Recorded, Measured>| {
         match (&heap.node.record, measured(&heap.childresults)) {
             (Record::Ended(complete), Some(children)) => {
                 Ok(Span { complete: complete.clone(), children })
@@ -174,10 +174,10 @@ impl Profile {
     /// Read a recorded forest as measurements. Fused: the tree is small and
     /// every node is a handful of moves.
     pub fn of(forest: &[Recorded]) -> Result<Self, Unfinished<'_>> {
-        let fold = reading();
+        let fold = measuring();
         let shape = treeish(|node: &Recorded| node.children.to_vec());
 
-        let readings: Vec<Reading> =
+        let readings: Vec<Measured> =
             forest.iter().map(|tree| FUSED.run(&fold, &shape, tree)).collect();
         let resolved = Profile { roots: salvage(&readings) };
 

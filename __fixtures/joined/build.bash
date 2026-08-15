@@ -21,16 +21,16 @@ if (( $# > 0 )); then
     BC_JOIN "$@"
 fi
 
-compile() { sleep 0.01; BASHPROF_TIME_CPS link link; }
+compile() { sleep 0.01; BASHPROF_TIMETHIS link link; }
 link()    { sleep 0.01; }
 package() { sleep 0.01; }
 
 build() {
-    BASHPROF_TIME_CPS compile compile
-    BASHPROF_TIME_CPS package package
+    BASHPROF_TIMETHIS compile compile
+    BASHPROF_TIMETHIS package package
 }
 
-BASHPROF_TIME_CPS build build
+BASHPROF_TIMETHIS build build
 echo built
 
 # `wait` is what says the reading is written: the server does its reading after

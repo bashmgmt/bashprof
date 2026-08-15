@@ -5,7 +5,7 @@
 #     source lib/bashprof.bash
 #     declare -F __bp_begin >/dev/null || { __bp_begin() { :; }; __bp_end() { :; }; }
 #
-#     BASHPROF_TIME_CPS <label> <command> [args…]
+#     BASHPROF_TIMETHIS <label> <command> [args…]
 #
 # Nothing here names the protocol. Nothing is timed here either: the wire
 # stamps every message with the sending shell's $EPOCHREALTIME, so a span is
@@ -18,7 +18,7 @@
 #
 #     measure_step() {
 #         local __BASHPROF_STACK_SHIFT=1
-#         BASHPROF_TIME_CPS "$@"
+#         BASHPROF_TIMETHIS "$@"
 #     }
 #
 # 125 is what the protocol's own words return when they could not do their job.
@@ -38,7 +38,7 @@
 #
 # `$?` is read as the first command after the call, which is the only place it
 # survives, and returned after the END has clobbered it.
-BASHPROF_TIME_CPS() {
+BASHPROF_TIMETHIS() {
     local __BP_label="${1-}"
     shift || return 125
 

@@ -27,10 +27,10 @@ __bp_begin() {
     __BP_made=$(( ${__BP_made:-0} + 1 ))
     __BP_id="$BASHPID.$__BP_made"
 
-    BC_INSTR say TIME_CPS BEGIN id "$__BP_id" inside "${__BP_inside-}" \
+    BC_INSTR say TIMETHIS BEGIN id "$__BP_id" inside "${__BP_inside-}" \
         label "$__BP_label" argv "(${*@Q})" "${__BP_stack[@]}"
 }
 
 __bp_end() {
-    BC_INSTR say TIME_CPS END id "$__BP_id" status "$1"
+    BC_INSTR say TIMETHIS END id "$__BP_id" status "$1"
 }

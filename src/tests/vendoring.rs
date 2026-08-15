@@ -1,9 +1,9 @@
-//! What a client ships: the word `BASHPROF_TIME_CPS`, and the guard that
+//! What a client ships: the word `BASHPROF_TIMETHIS`, and the guard that
 //! decides whether it does anything.
 
 use std::process::Command;
 
-use crate::bash::rig::{heard, ExitStatus, Master};
+use crate::bash::rig::{heard, Driving, ExitStatus};
 use crate::bash;
 use crate::bashprof::{recorded, BashProf, Profile, WORDS};
 use crate::tests::scripts::{bash, Scripts};
@@ -31,7 +31,7 @@ fn vendoring() -> Scripts {
                 "set -euo pipefail\n\
                  source \"$(dirname \"${{BASH_SOURCE[0]}}\")/bashprof.bash\"\n{GUARD}\n\
                  step() {{ echo \"ran $1\"; }}\n\
-                 BASHPROF_TIME_CPS build step target\n"
+                 BASHPROF_TIMETHIS build step target\n"
             ),
         ),
     ])
