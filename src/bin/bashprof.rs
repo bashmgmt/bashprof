@@ -192,7 +192,7 @@ async fn run(reading: &Reading, reaching: Reaching, argv: &[String]) -> i32 {
 /// Nothing here starts a shell or ends one, so there is no subject's status to
 /// hand back — only whether the reading came out whole. The client's `BC_LEAVE`
 /// waits for this process, so that status is what its own `set -e` sees. What
-/// the address reaches is the client's, so `reaching` is not read.
+/// the address reaches is the client's: `Serving` reads no `Reaching`.
 async fn serve(reading: &Reading) -> Result<(), Failure> {
     reading.claim()?;
 

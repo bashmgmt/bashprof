@@ -15,20 +15,25 @@ options, from the same `Reading` struct — the symmetry is the code, not a
 convention:
 
 ```
-bashprof run_bash_env --into FILE [--output …] -- <command…>
-bashprof serve        --into FILE [--output …]
+bashprof run   [--reach bash-env|by-hand] --into FILE [--output …] -- <command…>
+bashprof serve --into FILE [--output …]
 ```
 
 | | who starts the shells | how they are reached | its exit code |
 |---|---|---|---|
-| `run_bash_env` | the tool, from the command line it was given | `BASH_ENV`, so the whole process tree joins | the subject's |
-| `serve` | a bash script, which started this process as a coprocess | the address, written on stdout for the client to run | its own: 0, or 1 if the reading did not come out |
+| `run` | the tool, from the command line it was given | `BC_SESSION` in the environment always; `--reach bash-env` (the default) also `BASH_ENV`, so the whole process tree joins; `--reach by-hand` leaves it to the scripts | the subject's |
+| `serve` | a bash script, which started this process as a coprocess | the address, written on stdout for the client to source | its own: 0, or 1 if the reading did not come out |
 
 `serve` is the shipped half of what `assets/joining.bash` starts —
 `BC_START bashprof serve --into build.times`. Nothing about the reading changes
 between the two, and `__fixtures/joined/build.bash` runs under both plus under
 no server at all, which is the vendoring contract end to end
-([tests/cli.rs](../../../tests/cli.rs)).
+([tests/cli.rs](../../../tests/cli.rs)). `run --help` and `serve --help` end
+with `JOINING`, every way a script joins.
+
+```rust
+pub struct BashProf { pub reaching: Reaching }
+```
 
 `--output` chooses **how far the run is read**, and in what:
 
@@ -93,8 +98,7 @@ nothing about.
 
 Nothing of bashprof's is written to stdout or stderr but its own failures, so a
 profiled run pipes exactly as an unprofiled one does. That is what `--into`
-is for, and it is the only way out. `bashcap run_bash_env --into` is the
-same rule.
+is for, and it is the only way out. `bashcap run --into` is the same rule.
 
 The file is truncated before the subject starts, so an unwritable path is known
 straight away and a run that reads as nothing leaves nothing earlier standing in
