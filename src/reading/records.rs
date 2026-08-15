@@ -144,11 +144,7 @@ impl Recording {
             })
             .collect();
 
-        records.sort_by_key(|read| {
-            let stamp = read.record.call().stamp;
-
-            (stamp.sent_at, stamp.nth)
-        });
+        records.sort_by_key(|read| read.record.call().stamp.sent_at);
         records
     }
 }

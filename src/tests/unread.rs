@@ -7,9 +7,9 @@
 use super::*;
 
 /// Everything the run recorded, and why the rest did not.
-fn read(script: &str) -> Result<Vec<Recorded>, Unread> {
+async fn read(script: &str) -> Result<Vec<Recorded>, Unread> {
     let scripts = Scripts::of(&[("subject.bash", script)]);
-    let ran = BashProf.run(&bash(scripts.at("subject.bash"))).unwrap().whole().unwrap();
+    let ran = BashProf.run(&bash(scripts.at("subject.bash"))).await.unwrap().whole().unwrap();
 
     assert_eq!(ran.subject, ExitStatus::Code(0), "the subject itself is fine");
 
@@ -18,15 +18,16 @@ fn read(script: &str) -> Result<Vec<Recorded>, Unread> {
 
 /// A BEGIN with a field missing is set aside, and the calls around it are no
 /// less true for it.
-#[test]
-fn a_message_that_will_not_read_leaves_the_rest_standing() {
+#[tokio::test]
+async fn a_message_that_will_not_read_leaves_the_rest_standing() {
     let unread = read(
         r#"
         BASHPROF_TIMETHIS before true
-        BC_INSTR say TIMETHIS BEGIN id 1.99 inside "" label mangled
+        BC_INSTR BASHPROF say TIMETHIS BEGIN id 1.99 inside "" label mangled
         BASHPROF_TIMETHIS after true
         "#,
     )
+    .await
     .expect_err("the mangled BEGIN");
 
     let labels: Vec<&str> =
@@ -40,20 +41,21 @@ fn a_message_that_will_not_read_leaves_the_rest_standing() {
 /// A call made inside one that never began is unreachable from any root, so
 /// the tree drops it. That the tree is shorter than what was read is the only
 /// record of it, and it is the forest's own shape.
-#[test]
-fn a_call_whose_enclosing_one_never_began_is_dropped_and_counted() {
+#[tokio::test]
+async fn a_call_whose_enclosing_one_never_began_is_dropped_and_counted() {
     let unread = read(
         r#"
         GHOST() {
             local -a __w=()
             __bc_stack __w 2
-            BC_INSTR say TIMETHIS BEGIN id 1.99 inside nobody label ghost argv "()" "${__w[@]}"
+            BC_INSTR BASHPROF say TIMETHIS BEGIN id 1.99 inside nobody label ghost argv "()" "${__w[@]}"
         }
 
         BASHPROF_TIMETHIS kept true
         GHOST
         "#,
     )
+    .await
     .expect_err("the orphaned call");
 
     let labels: Vec<&str> =
@@ -66,7 +68,7 @@ fn a_call_whose_enclosing_one_never_began_is_dropped_and_counted() {
 
 /// A run with nothing wrong in it says so by reading whole, which is what
 /// every other test in this module relies on.
-#[test]
-fn a_sound_run_reads_without_a_word() {
-    assert!(read("BASHPROF_TIMETHIS only true\n").is_ok());
+#[tokio::test]
+async fn a_sound_run_reads_without_a_word() {
+    assert!(read("BASHPROF_TIMETHIS only true\n").await.is_ok());
 }

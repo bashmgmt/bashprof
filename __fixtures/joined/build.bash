@@ -12,13 +12,13 @@ __root="${BASH_SOURCE[0]%/*}/../.."
 
 # The word, and empty hooks for when nothing is there to measure. Joining
 # replaces them with the ones that do — which is why the guard comes first and
-# `BC_JOIN` after it.
+# `BC_START` after it.
 source "$__root/assets/bashprof.bash"
 declare -F __bp_begin >/dev/null || { __bp_begin() { :; }; __bp_end() { :; }; }
 
 if (( $# > 0 )); then
     source "$__root/assets/joining.bash"
-    BC_JOIN "$@"
+    BC_START "$@"
 fi
 
 compile() { sleep 0.01; BASHPROF_TIMETHIS link link; }

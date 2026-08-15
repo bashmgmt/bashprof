@@ -121,9 +121,10 @@ impl Reading {
     }
 }
 
-fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
     let code = match Cli::try_parse() {
-        Ok(cli) => perform(&cli.what),
+        Ok(cli) => perform(&cli.what).await,
         // `--help` and `--version` are complaints too, and clap gives them
         // their own code — 0, where a real misuse is 2.
         Err(complaint) => {
@@ -135,10 +136,10 @@ fn main() {
     std::process::exit(code);
 }
 
-fn perform(what: &What) -> i32 {
+async fn perform(what: &What) -> i32 {
     match what {
-        What::RunBashEnv { reading, argv } => run(reading, argv),
-        What::Serve { reading } => match serve(reading) {
+        What::RunBashEnv { reading, argv } => run(reading, argv).await,
+        What::Serve { reading } => match serve(reading).await {
             Ok(()) => 0,
             Err(why) => {
                 eprintln!("bashprof: {why}");
@@ -152,13 +153,13 @@ fn perform(what: &What) -> i32 {
 /// is indistinguishable from an unprofiled one. Where the subject succeeded
 /// and bashprof could not write what was asked for, the failure is bashprof's
 /// and so is the status.
-fn run(reading: &Reading, argv: &[String]) -> i32 {
+async fn run(reading: &Reading, argv: &[String]) -> i32 {
     if let Err(why) = reading.claim() {
         eprintln!("bashprof: {why}");
         return 1;
     }
 
-    match BashProf.run(argv) {
+    match BashProf.run(argv).await {
         Err(why) => {
             eprintln!("bashprof: {why}");
             1
@@ -180,10 +181,10 @@ fn run(reading: &Reading, argv: &[String]) -> i32 {
 /// Nothing here starts a shell or ends one, so there is no subject's status to
 /// hand back — only whether the reading came out whole. The client's `BC_LEAVE`
 /// waits for this process, so that status is what its own `set -e` sees.
-fn serve(reading: &Reading) -> Result<(), Failure> {
+async fn serve(reading: &Reading) -> Result<(), Failure> {
     reading.claim()?;
 
-    let served = BashProf.serve_coprocess()?;
+    let served = BashProf.serve_coprocess().await?;
 
     reading.keep(&served.shells)?;
     served.failed.map_or(Ok(()), Err)

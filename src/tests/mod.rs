@@ -27,9 +27,9 @@ use crate::tests::scripts::{bash, Scripts};
 /// Run a script under the profiler. What comes back is the tree as recorded —
 /// every call that began, ended or not. Reading it as timings is the caller's,
 /// which is what each test below does next.
-fn profiled(script: &str) -> (Vec<Recorded>, ExitStatus) {
+async fn profiled(script: &str) -> (Vec<Recorded>, ExitStatus) {
     let scripts = Scripts::of(&[("subject.bash", script)]);
-    let ran = BashProf.run(&bash(scripts.at("subject.bash"))).unwrap().whole().unwrap();
+    let ran = BashProf.run(&bash(scripts.at("subject.bash"))).await.unwrap().whole().unwrap();
 
     (recorded(&heard(&ran.shells)).expect("the instrument's own messages"), ran.subject)
 }

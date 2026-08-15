@@ -23,7 +23,7 @@ fn call(label: &str, began: u64) -> Call {
         }])
         .unwrap(),
         shell: accounts::reading("/x.bash"),
-        stamp: Stamp { nth: began, seq: 0, sent_at: Micros(began), heard_at: Micros(began) },
+        stamp: Stamp { sent_at: Micros(began), heard_at: Micros(began) },
     }
 }
 

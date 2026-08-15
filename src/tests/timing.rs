@@ -1,8 +1,8 @@
 use super::*;
 
-#[test]
-fn a_spans_time_covers_its_own_work_and_everything_it_called() {
-    let recorded = profiled(TREE).0;
+#[tokio::test]
+async fn a_spans_time_covers_its_own_work_and_everything_it_called() {
+    let recorded = profiled(TREE).await.0;
     let profile = Profile::of(&recorded).expect("a complete profile");
     let a = &profile.roots[0];
 

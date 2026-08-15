@@ -52,10 +52,10 @@ fn the_vendored_word_runs_an_instrumented_script_unprofiled() {
 /// line, so the client's `source` comes second and redefines the word with the
 /// same bytes — and the guard, naming the hook rather than the word, finds the
 /// real one and leaves it.
-#[test]
-fn the_guard_leaves_the_real_hooks_in_place_under_the_tool() {
+#[tokio::test]
+async fn the_guard_leaves_the_real_hooks_in_place_under_the_tool() {
     let scripts = vendoring();
-    let ran = BashProf.run(&bash(scripts.at("build.bash"))).unwrap().whole().unwrap();
+    let ran = BashProf.run(&bash(scripts.at("build.bash"))).await.unwrap().whole().unwrap();
 
     assert_eq!(ran.subject, ExitStatus::Code(0));
 

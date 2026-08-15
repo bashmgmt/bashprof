@@ -1,8 +1,8 @@
 use super::*;
 
-#[test]
-fn measurements_nest_the_way_the_calls_do() {
-    let (recorded, status) = profiled(TREE);
+#[tokio::test]
+async fn measurements_nest_the_way_the_calls_do() {
+    let (recorded, status) = profiled(TREE).await;
     assert_eq!(status, ExitStatus::Code(0));
     println!("as recorded:\n{}\n", Recorded::render(&recorded));
 
@@ -23,8 +23,8 @@ fn measurements_nest_the_way_the_calls_do() {
     assert!(a.all().iter().all(|span| span.complete.call.shell.pid == a.complete.call.shell.pid), "one shell produced all of it");
 }
 
-#[test]
-fn a_call_measured_in_a_subshell_nests_where_it_was_made() {
+#[tokio::test]
+async fn a_call_measured_in_a_subshell_nests_where_it_was_made() {
     let (recorded, status) = profiled(
         r#"
         f__A() {
@@ -33,7 +33,8 @@ fn a_call_measured_in_a_subshell_nests_where_it_was_made() {
         }
         BASHPROF_TIMETHIS a f__A
         "#,
-    );
+    )
+    .await;
 
     assert_eq!(status, ExitStatus::Code(0));
     let profile = Profile::of(&recorded).expect("every call ended");
@@ -46,8 +47,8 @@ fn a_call_measured_in_a_subshell_nests_where_it_was_made() {
     assert_ne!(at(a, &["forked"]).complete.call.shell.pid, a.complete.call.shell.pid, "and it did run in a shell of its own");
 }
 
-#[test]
-fn concurrent_forks_of_one_line_keep_their_own_calls() {
+#[tokio::test]
+async fn concurrent_forks_of_one_line_keep_their_own_calls() {
     let (recorded, status) = profiled(
         r#"
         f__work() {
@@ -65,7 +66,8 @@ fn concurrent_forks_of_one_line_keep_their_own_calls() {
 
         BASHPROF_TIMETHIS a f__A
         "#,
-    );
+    )
+    .await;
 
     assert_eq!(status, ExitStatus::Code(0));
     println!("as recorded:\n{}\n", Recorded::render(&recorded));
@@ -87,8 +89,8 @@ fn concurrent_forks_of_one_line_keep_their_own_calls() {
     assert!(a.exclusive() < a.complete.took(), "and what neither covered is a's own\n{profile}");
 }
 
-#[test]
-fn a_name_is_inherited_through_two_levels_of_forking() {
+#[tokio::test]
+async fn a_name_is_inherited_through_two_levels_of_forking() {
     let (recorded, status) = profiled(
         r#"
         f__A() {
@@ -100,7 +102,8 @@ fn a_name_is_inherited_through_two_levels_of_forking() {
 
         BASHPROF_TIMETHIS a f__A
         "#,
-    );
+    )
+    .await;
 
     assert_eq!(status, ExitStatus::Code(0));
     let profile = Profile::of(&recorded).expect("every call ended");
@@ -119,9 +122,9 @@ fn a_name_is_inherited_through_two_levels_of_forking() {
     );
 }
 
-#[test]
-fn every_measurement_has_a_name_of_its_own() {
-    let recorded = profiled(TREE).0;
+#[tokio::test]
+async fn every_measurement_has_a_name_of_its_own() {
+    let recorded = profiled(TREE).await.0;
     let profile = Profile::of(&recorded).expect("a complete profile");
     let a = &profile.roots[0];
 

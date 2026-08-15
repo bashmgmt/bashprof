@@ -1,8 +1,8 @@
 use super::*;
 
-#[test]
-fn a_call_carries_the_whole_stack_it_was_made_on() {
-    let recorded = profiled(TREE).0;
+#[tokio::test]
+async fn a_call_carries_the_whole_stack_it_was_made_on() {
+    let recorded = profiled(TREE).await.0;
     let c = calls(&recorded).into_iter().find(|call| call.label == "c").expect("c was measured");
 
     assert_eq!(c.stack.top().site.to_string(), "f__B", "where the call was made");
@@ -13,8 +13,8 @@ fn a_call_carries_the_whole_stack_it_was_made_on() {
     );
 }
 
-#[test]
-fn a_wrapper_can_move_the_walk_past_itself() {
+#[tokio::test]
+async fn a_wrapper_can_move_the_walk_past_itself() {
     let recorded = profiled(
         r#"
         f__leaf() { :; }
@@ -29,6 +29,7 @@ fn a_wrapper_can_move_the_walk_past_itself() {
         BASHPROF_TIMETHIS a f__A
         "#,
     )
+    .await
     .0;
 
     let profile = Profile::of(&recorded).expect("every call ended");
@@ -38,9 +39,9 @@ fn a_wrapper_can_move_the_walk_past_itself() {
     assert_eq!(a.complete.call.stack.top().site.to_string(), "main", "and the unwrapped call is unaffected\n{profile}");
 }
 
-#[test]
-fn a_span_says_where_its_call_was_made() {
-    let recorded = profiled(TREE).0;
+#[tokio::test]
+async fn a_span_says_where_its_call_was_made() {
+    let recorded = profiled(TREE).await.0;
     let profile = Profile::of(&recorded).expect("a complete profile");
     let a = &profile.roots[0];
 

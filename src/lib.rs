@@ -11,7 +11,9 @@
 //! use mb_resolver::bash::rig::{heard, Driving};
 //! use mb_resolver::bashprof::{recorded, BashProf, Profile};
 //!
-//! let ran = BashProf.run(&["bash", "build.bash"])?;
+//! # #[tokio::main(flavor = "current_thread")]
+//! # async fn main() -> Result<(), mb_resolver::bash::rig::Failure> {
+//! let ran = BashProf.run(&["bash", "build.bash"]).await?;
 //!
 //! // Two readings, and each hands back what it did read when it refuses.
 //! let forest = recorded(&heard(&ran.shells)).unwrap_or_else(|unread| unread.resolved);
@@ -20,7 +22,8 @@
 //!     Ok(profile) => println!("{profile}"),
 //!     Err(unfinished) => println!("{}", unfinished.resolved),
 //! }
-//! # Ok::<(), mb_resolver::bash::rig::Failure>(())
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! The modules are private, and [`recorded`] is the whole reading. Each module
@@ -36,7 +39,9 @@ pub(crate) mod record;
 
 use std::sync::Arc;
 
-use crate::bash::rig::{Driving, Failure, Layout, Message, Rig, Serving, Shell, Workspace};
+use crate::bash::rig::{
+    Driving, Failure, Layout, Message, Rig, Serving, Setup, Shell, Workspace,
+};
 use crate::bash::stack;
 
 /// `BASHPROF_TIMETHIS`, the word a call site says. Shipped as an asset so a
@@ -47,10 +52,13 @@ pub(crate) const WORDS: &str = include_str!("../../assets/bashprof.bash");
 /// `__bp_begin` and `__bp_end`, which are what make that word measure.
 pub(crate) const EFFECT: &str = include_str!("effect.bash");
 
+/// The label bashprof's word speaks under.
+const JOIN: &str = "BC_JOIN BASHPROF\n";
+
 /// The bash a rig hands the subject, for any rig that wants what bashprof
 /// measures. The frame walk comes with it, since a measurement reports one.
 pub fn instrument() -> String {
-    stack::with_walk(&[WORDS, EFFECT])
+    stack::with_walk(&[WORDS, EFFECT, JOIN])
 }
 
 pub use reading::{recorded, Profile, Recorded, Span, Unfinished, Unread};
@@ -69,15 +77,11 @@ pub struct BashProf;
 impl Rig for BashProf {
     type Reaction = Vec<Message>;
 
-    fn bash(&self) -> String {
-        instrument()
+    fn setup(&self) -> Setup {
+        Setup { bash: instrument(), workspace: Workspace::Temporary }
     }
 
-    fn workspace(&self) -> Workspace {
-        Workspace::Temporary
-    }
-
-    fn joined(&self, _at: &Layout, _shell: Arc<Shell>) -> Result<Vec<Message>, Failure> {
+    async fn joined(&self, _at: &Layout, _shell: Arc<Shell>) -> Result<Vec<Message>, Failure> {
         Ok(Vec::new())
     }
 }
