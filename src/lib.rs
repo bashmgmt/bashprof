@@ -46,10 +46,8 @@ use std::sync::Arc;
 use bash_interop::rig::{Driving, Failure, Layout, Message, Rig, Serving, Shell};
 use bash_interop::stack;
 
-/// `BASHPROF_TIMETHIS`, the word a call site says. Shipped as an asset so a
-/// client's copy and the injected one are the same bytes, and naming nothing
-/// of the protocol.
-pub(crate) const WORDS: &str = include_str!("../assets/bashprof.bash");
+/// `BASHPROF_TIMETHIS`, the word a call site says.
+pub(crate) const WORDS: &str = include_str!("words.bash");
 
 /// `__bp_begin` and `__bp_end`, which are what make that word measure.
 pub(crate) const EFFECT: &str = include_str!("effect.bash");

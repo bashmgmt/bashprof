@@ -8,14 +8,14 @@
 //! | [`walks`] | the stack a measurement carries, and moving it past a wrapper |
 //! | [`unfinished`] | a run the shell died inside, and what survives it |
 //! | [`unread`] | a message the instrument mangled, and what survives it |
-//! | [`vendoring`] | the word a client ships, and the guard that keeps its effect |
+//! | [`shipped`] | what the injected bash may not do to a shell |
 
 mod arithmetic;
 mod nesting;
 mod timing;
 mod unfinished;
 mod unread;
-mod vendoring;
+mod shipped;
 mod walks;
 
 use std::collections::HashSet;

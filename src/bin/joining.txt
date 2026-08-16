@@ -31,8 +31,3 @@ if [[ -n ${BASHPROF_SESSION-} ]]; then
     source "$BASHPROF_SESSION/rig.bash"
     BASHPROF_INIT "$BASHPROF_SESSION"
 fi
-
-# The words a client vendors, and the polyfill for when nothing is listening —
-# after the load, so a session's own hooks win:
-source lib/bashprof.bash
-declare -F __bp_begin >/dev/null || { __bp_begin() { :; }; __bp_end() { :; }; }

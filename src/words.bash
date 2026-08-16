@@ -1,13 +1,8 @@
-# The word bashprof gives a script. This file is what the tool injects and what
-# a client vendors, so the word has one definition and only its effect exists
-# twice:
-#
-#     source lib/bashprof.bash
-#     declare -F __bp_begin >/dev/null || { __bp_begin() { :; }; __bp_end() { :; }; }
+# The word bashprof gives a script:
 #
 #     BASHPROF_TIMETHIS <label> <command> [args…]
 #
-# Nothing here names the protocol. Nothing is timed here either: the wire
+# Nothing is timed here: the wire
 # stamps every message with the sending shell's $EPOCHREALTIME, so a span is
 # the interval between two of them. Nothing is inferred either — a call is
 # given a name, hands that name to everything it runs, and reports the name it

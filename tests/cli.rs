@@ -203,18 +203,13 @@ fn fixture(relative: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("__fixtures").join(relative)
 }
 
-/// The vendoring contract end to end, over the shipped binary: the same script
-/// builds on its own with the empty hooks, and measures itself when it is
-/// given a server to start. Nothing about the script changes between the two.
+/// A served session end to end, over the shipped binary: a script starts
+/// the server itself, measures itself, and holds the reading when it exits.
 #[test]
 fn a_script_starts_bashprof_for_itself_and_keeps_the_reading() {
     let build = fixture("joined/build.bash");
     let scripts = Scripts::of(&[]);
     let into = scripts.at("build.times");
-
-    let alone = Command::new("bash").arg(&build).output().expect("bash");
-    assert_eq!(String::from_utf8(alone.stdout).unwrap(), "built\n", "it runs on its own");
-    assert_eq!(alone.status.code(), Some(0));
 
     let joined = Command::new("bash")
         .arg(&build)

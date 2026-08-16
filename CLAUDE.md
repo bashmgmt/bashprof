@@ -1,8 +1,7 @@
 # bashprof — working in this crate
 
 A thin user of `bash-interop`: the instrument (bash injected into every
-shell), the rig impl, the reading, and the `bashprof` binary. The words a client
-vendors are `assets/bashprof.bash`. Reference: `docs/bashprof.md`.
+shell), the rig impl, the reading, and the `bashprof` binary. Reference: `docs/bashprof.md`.
 
 ```bash
 cargo test --lib -- --test-threads=1

@@ -27,9 +27,8 @@ bashprof serve --at DIR --into FILE [--output …]
 `serve` is the shipped half of a client's own coprocess —
 `coproc SERVER { bashprof serve --at "$PWD/prof.d" --into build.times; }`.
 Nothing about the reading changes
-between the two, and `__fixtures/joined/build.bash` runs under both plus under
-no server at all, which is the vendoring contract end to end
-([tests/cli.rs](../tests/cli.rs)). `run --help` and `serve --help` end
+between the two, and `__fixtures/joined/build.bash` is the client story in
+one file ([tests/cli.rs](../tests/cli.rs)). `run --help` and `serve --help` end
 with every way a script joins, in this tool's words.
 
 ```rust
@@ -115,9 +114,15 @@ is the status: 1, with the reason on stderr.
 The text renderings that `Profile` and `Recorded::render` produce stay in the
 library, for a caller assembling a report of its own.
 
-Keeping a script's call sites runnable without the tool is the client's own,
-and `assets/bashprof.bash` is what it vendors to do it — see
-`bash-interop/docs/vendoring.md`.
+A call site makes bashprof a dependency of the script that says it:
+outside a session the word is a missing command, loudly. A script that
+must also run without the tool defines the word itself —
+
+```bash
+declare -F BASHPROF_TIMETHIS >/dev/null || BASHPROF_TIMETHIS() { shift; "$@"; }
+```
+
+— one line of its own, unshipped.
 
 ## The layers are aliases
 
