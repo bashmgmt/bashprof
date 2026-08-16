@@ -27,10 +27,13 @@ fn vendoring() -> Scripts {
         (
             "build.bash",
             &format!(
-                "set -euo pipefail\n\
-                 source \"$(dirname \"${{BASH_SOURCE[0]}}\")/bashprof.bash\"\n{GUARD}\n\
-                 step() {{ echo \"ran $1\"; }}\n\
-                 BASHPROF_TIMETHIS build step target\n"
+                r#"
+                set -euo pipefail
+                source "$(dirname "${{BASH_SOURCE[0]}}")/bashprof.bash"
+                {GUARD}
+                step() {{ echo "ran $1"; }}
+                BASHPROF_TIMETHIS build step target
+                "#
             ),
         ),
     ])

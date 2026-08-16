@@ -67,7 +67,8 @@ fn bashprof(scripts: &Scripts, output: &[&str]) -> Ran {
 fn dying() -> Scripts {
     Scripts::of(&[(
         "build.bash",
-        r#"set -e
+        r#"
+        set -e
         step()   { echo "the subject's own stdout"; }
         broken() { false; }
 
@@ -135,7 +136,8 @@ fn the_recorded_reading_keeps_the_call_that_never_ended() {
 fn mangled() -> Scripts {
     Scripts::of(&[(
         "build.bash",
-        r#"BASHPROF_TIMETHIS before true
+        r#"
+        BASHPROF_TIMETHIS before true
         BC_INSTR BASHPROF say TIMETHIS BEGIN id 1.99 inside "" label mangled
         BASHPROF_TIMETHIS after true
         "#,
