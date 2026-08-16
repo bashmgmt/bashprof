@@ -8,13 +8,15 @@
 //! on the wire rather than being reconstructed from it.
 //!
 //! ```no_run
-//! use bash_interop::rig::{heard, Driving};
+//! use bash_interop::rig::{heard, Driving, Provision, Rig};
 //! use bashprof::{recorded, BashProf, Profile};
 //!
 //! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() -> Result<(), bash_interop::rig::Failure> {
 //! let ran = BashProf
-//!     .run(&["bash", "build.bash"], |at| vec![at.bash_env()])
+//!     .run(&["bash", "build.bash"], |at| {
+//!         Ok(vec![at.bash_env(Provision::Joining(&BashProf.joining(at)))?])
+//!     })
 //!     .await?;
 //!
 //! // Two readings, and each hands back what it did read when it refuses.
@@ -52,13 +54,23 @@ pub(crate) const WORDS: &str = include_str!("../assets/bashprof.bash");
 /// `__bp_begin` and `__bp_end`, which are what make that word measure.
 pub(crate) const EFFECT: &str = include_str!("effect.bash");
 
-/// The bash a rig hands the subject, for any rig that wants what bashprof
-/// measures, generated against the settled workspace: the words speak under
-/// `BASHPROF`, and the join carries the coordinate baked in, quoted. The
-/// frame walk comes with it, since a measurement reports one.
-pub fn instrument(at: &Layout) -> String {
-    let join = format!("BC_JOIN BASHPROF {}\n", bash_strings::emit_scalar(at.text()));
-    stack::with_walk(&[WORDS, EFFECT, &join])
+/// The definitions a rig hands the subject, for any rig that wants what
+/// bashprof measures: the words speak under `BASHPROF`, the frame walk comes
+/// with them since a measurement reports one, and `BASHPROF_INIT <dir>` is
+/// the channel setup on offer — defined here, called by nothing here.
+pub fn instrument() -> String {
+    const INIT: &str = r#"
+BASHPROF_INIT() {
+    BC_JOIN BASHPROF "${1:?the session workspace}"
+}
+"#;
+    stack::with_walk(&[WORDS, EFFECT, INIT])
+}
+
+/// The standard initiation: `BASHPROF_INIT '<dir>'`. Data — written into a
+/// provisioned `bash_env.bash`, or said by a client's own line.
+pub fn joining(at: &Layout) -> String {
+    format!("BASHPROF_INIT {}\n", bash_strings::emit_scalar(at.text()))
 }
 
 pub use reading::{recorded, Profile, Recorded, Span, Unfinished, Unread};
@@ -77,8 +89,12 @@ pub struct BashProf;
 impl Rig for BashProf {
     type Reaction = Vec<Message>;
 
-    fn bash(&self, at: &Layout) -> String {
-        instrument(at)
+    fn bash(&self, _at: &Layout) -> String {
+        instrument()
+    }
+
+    fn joining(&self, at: &Layout) -> String {
+        joining(at)
     }
 
     async fn joined(&self, _at: &Layout, _shell: Arc<Shell>) -> Result<Vec<Message>, Failure> {

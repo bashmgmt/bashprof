@@ -9,7 +9,7 @@ use super::*;
 /// Everything the run recorded, and why the rest did not.
 async fn read(script: &str) -> Result<Vec<Recorded>, Unread> {
     let scripts = Scripts::of(&[("subject.bash", script)]);
-    let ran = BashProf.run(&bash(scripts.at("subject.bash")), |at| vec![at.bash_env()]).await.unwrap().whole().unwrap();
+    let ran = BashProf.run(&bash(scripts.at("subject.bash")), |at| Ok(vec![at.bash_env(Provision::Joining(&crate::joining(at)))?])).await.unwrap().whole().unwrap();
 
     assert_eq!(ran.subject, ExitStatus::Code(0), "the subject itself is fine");
 

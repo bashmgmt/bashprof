@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use bash_interop::rig::{
-    heard, Attended, Doing, Driving, Failure, Layout, Message, Said, Serving, JOINING,
+    heard, Attended, Doing, Driving, Failure, Layout, Message, Provision, Said, Serving, JOINING,
 };
 use bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
 
@@ -36,8 +36,8 @@ enum What {
 
         /// How the shells find the instrument: bash-env has every
         /// non-interactive bash in the tree join as it starts; by-hand leaves
-        /// it to the scripts, which join with
-        /// `source "$BC_SESSION/session.bash"`.
+        /// initiation to the scripts, which join with
+        /// `BASHPROF_INIT "$BC_SESSION"`.
         #[arg(long, value_enum, default_value_t = Reach::BashEnv)]
         reach: Reach,
 
@@ -84,13 +84,14 @@ struct Reading {
 /// mapped onto the run's environment closure.
 #[derive(Copy, Clone, ValueEnum)]
 enum Reach {
-    /// BC_SESSION carries the workspace and BASH_ENV the session file:
-    /// every non-interactive bash
+    /// BC_SESSION carries the workspace and BASH_ENV a provisioned file
+    /// that initiates: every non-interactive bash
     /// in the tree joins as it starts.
     BashEnv,
 
-    /// BC_SESSION alone: a script joins where it says
-    /// `source "$BC_SESSION/session.bash"`.
+    /// The provisioned file only defines, and BC_SESSION carries the
+    /// workspace: a script joins where it says
+    /// `BASHPROF_INIT "$BC_SESSION"`.
     ByHand,
 }
 
@@ -101,11 +102,13 @@ fn session(at: &Layout) -> (OsString, OsString) {
 }
 
 impl Reach {
-    fn environment(self, at: &Layout) -> Vec<(OsString, OsString)> {
-        match self {
-            Self::BashEnv => vec![session(at), at.bash_env()],
-            Self::ByHand => vec![session(at)],
-        }
+    fn environment(self, at: &Layout) -> Result<Vec<(OsString, OsString)>, Failure> {
+        Ok(match self {
+            Self::BashEnv => {
+                vec![session(at), at.bash_env(Provision::Joining(&bashprof::joining(at)))?]
+            }
+            Self::ByHand => vec![session(at), at.bash_env(Provision::Definitions)?],
+        })
     }
 }
 

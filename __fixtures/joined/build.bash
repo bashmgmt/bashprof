@@ -18,10 +18,11 @@ declare -F __bp_begin >/dev/null || { __bp_begin() { :; }; __bp_end() { :; }; }
 
 if (( $# > 0 )); then
     source "$__root/__fixtures/vendor/joining.bash"
-    __workspace="$(mktemp -d)"
-    BC_START "$@" --at "$__workspace"
-    until BC_UP "$__workspace"; do sleep 0.01; done
-    BC_ATTACH "$__workspace"
+    declare -- workspace="$(mktemp -d)"
+    BC_START "$@" --at "$workspace"
+    until BC_UP "$workspace"; do sleep 0.01; done
+    BC_LOAD "$workspace"
+    BASHPROF_INIT "$workspace"
 fi
 
 compile() { sleep 0.01; BASHPROF_TIMETHIS link link; }
@@ -41,5 +42,5 @@ echo built
 # was this script's to name, so it is this script's to remove.
 if (( $# > 0 )); then
     BC_LEAVE
-    rm -rf "$__workspace"
+    rm -rf "$workspace"
 fi

@@ -30,9 +30,9 @@ fn help_says_how_a_script_joins() {
         let help = Command::new(BASHPROF).args([verb, "--help"]).output().expect("--help");
         let text = String::from_utf8(help.stdout).unwrap();
 
-        assert!(text.contains(r#"source "$BC_SESSION/session.bash""#), "{verb} --help:\n{text}");
+        assert!(text.contains(r#"BASHPROF_INIT "$BC_SESSION""#), "{verb} --help:\n{text}");
         assert!(text.contains("BC_START"), "{verb} --help:\n{text}");
-        assert!(text.contains("BC_ATTACH"), "{verb} --help:\n{text}");
+        assert!(text.contains("BC_LOAD"), "{verb} --help:\n{text}");
     }
 }
 
