@@ -3,10 +3,9 @@
 
 use std::process::Command;
 
-use crate::bash::rig::{heard, Driving, ExitStatus};
-use crate::bash;
-use crate::bashprof::{recorded, BashProf, Profile, WORDS};
-use crate::tests::scripts::{bash, Scripts};
+use bash_interop::rig::{heard, Driving, ExitStatus};
+use crate::{recorded, BashProf, Profile, WORDS};
+use bash_interop::scratch::{bash, Scripts};
 
 /// The one line a client writes. It names the hooks rather than the word, so a
 /// client cannot displace the real one whichever order the two arrive in.
@@ -73,7 +72,7 @@ async fn the_guard_leaves_the_real_hooks_in_place_under_the_tool() {
 #[test]
 fn the_word_names_nothing_a_client_would_not_have() {
     for line in WORDS.lines().filter(|line| !line.trim_start().starts_with('#')) {
-        for name in bash::INJECTED_NAMES {
+        for name in bash_interop::INJECTED_NAMES {
             assert!(!line.contains(name), "{name} in a file a client vendors: {line}");
         }
     }

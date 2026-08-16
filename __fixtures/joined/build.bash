@@ -4,8 +4,8 @@
 #     build.bash                                     # just build
 #     build.bash bashprof serve --into build.times   # build, and keep the timings
 #
-# A shipped client vendors copies of the two files below; this one sources them
-# where they live, so the test and the tool cannot drift apart.
+# A shipped client vendors copies of the two files below; the vendored joining
+# is asserted against the core's in tests/cli.rs, so the copy cannot drift.
 set -euo pipefail
 
 __root="${BASH_SOURCE[0]%/*}/../.."
@@ -17,7 +17,7 @@ source "$__root/assets/bashprof.bash"
 declare -F __bp_begin >/dev/null || { __bp_begin() { :; }; __bp_end() { :; }; }
 
 if (( $# > 0 )); then
-    source "$__root/assets/joining.bash"
+    source "$__root/__fixtures/vendor/joining.bash"
     __workspace="$(mktemp -d)"
     BC_START "$@" --at "$__workspace"
 fi

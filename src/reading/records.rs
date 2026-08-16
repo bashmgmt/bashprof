@@ -12,11 +12,11 @@
 
 use std::collections::HashMap;
 
-use crate::bash::rig::{field, Doing, Failure, Micros, Said};
-use crate::bash::stack::Columns;
-use crate::bash::value::parse_array;
+use bash_interop::rig::{field, Doing, Failure, Micros, Said};
+use bash_interop::stack::Columns;
+use bash_strings::parse_array;
 
-use crate::bashprof::record::{Call, Complete, Id, Record};
+use crate::record::{Call, Complete, Id, Record};
 
 /// The word this instrument's messages begin with.
 const TAG: &str = "TIMETHIS";

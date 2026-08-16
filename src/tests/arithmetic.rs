@@ -3,12 +3,12 @@
 
 use std::sync::Arc;
 
-use crate::bash::rig::{Micros, Stamp};
-use crate::bash::stack::{Frame, Site, Source, Stack};
-use crate::tests::accounts;
+use bash_interop::rig::{Micros, Stamp};
+use bash_interop::stack::{Frame, Site, Source, Stack};
+use bash_interop::scratch::accounts;
 
-use crate::bashprof::reading::{Profile, Recorded, Span};
-use crate::bashprof::record::{Call, Complete, Id, Record};
+use crate::reading::{Profile, Recorded, Span};
+use crate::record::{Call, Complete, Id, Record};
 
 fn call(label: &str, began: u64) -> Call {
     Call {

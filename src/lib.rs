@@ -8,11 +8,11 @@
 //! on the wire rather than being reconstructed from it.
 //!
 //! ```no_run
-//! use mb_resolver::bash::rig::{heard, Driving};
-//! use mb_resolver::bashprof::{recorded, BashProf, Profile};
+//! use bash_interop::rig::{heard, Driving};
+//! use bashprof::{recorded, BashProf, Profile};
 //!
 //! # #[tokio::main(flavor = "current_thread")]
-//! # async fn main() -> Result<(), mb_resolver::bash::rig::Failure> {
+//! # async fn main() -> Result<(), bash_interop::rig::Failure> {
 //! let ran = BashProf
 //!     .run(&["bash", "build.bash"], |at| vec![at.bc_session(), at.bash_env()])
 //!     .await?;
@@ -41,13 +41,13 @@ pub(crate) mod record;
 
 use std::sync::Arc;
 
-use crate::bash::rig::{Driving, Failure, Layout, Message, Rig, Serving, Shell};
-use crate::bash::stack;
+use bash_interop::rig::{Driving, Failure, Layout, Message, Rig, Serving, Shell};
+use bash_interop::stack;
 
 /// `BASHPROF_TIMETHIS`, the word a call site says. Shipped as an asset so a
 /// client's copy and the injected one are the same bytes, and naming nothing
 /// of the protocol.
-pub(crate) const WORDS: &str = include_str!("../../assets/bashprof.bash");
+pub(crate) const WORDS: &str = include_str!("../assets/bashprof.bash");
 
 /// `__bp_begin` and `__bp_end`, which are what make that word measure.
 pub(crate) const EFFECT: &str = include_str!("effect.bash");

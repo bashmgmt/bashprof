@@ -21,7 +21,7 @@ mod timings;
 
 use std::fmt;
 
-use crate::bash::rig::{Failure, Said};
+use bash_interop::rig::{Failure, Said};
 
 pub use timings::{Profile, Span, Unfinished};
 pub use nesting::Recorded;

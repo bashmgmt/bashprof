@@ -20,9 +20,9 @@ mod walks;
 
 use std::collections::HashSet;
 
-use crate::bash::rig::{heard, Driving, ExitStatus};
-use crate::bashprof::{recorded, BashProf, Call, Profile, Recorded, Span, Unread};
-use crate::tests::scripts::{bash, Scripts};
+use bash_interop::rig::{heard, Driving, ExitStatus};
+use crate::{recorded, BashProf, Call, Profile, Recorded, Span, Unread};
+use bash_interop::scratch::{bash, Scripts};
 
 /// Run a script under the profiler. What comes back is the tree as recorded —
 /// every call that began, ended or not. Reading it as timings is the caller's,

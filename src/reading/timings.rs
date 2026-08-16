@@ -13,7 +13,7 @@ use hylic::prelude::{treeish, vec_fold, VecFold, VecHeap, FUSED};
 use serde::{Deserialize, Serialize};
 
 use super::nesting::Recorded;
-use crate::bashprof::record::{Call, Complete, Record};
+use crate::record::{Call, Complete, Record};
 use super::show;
 
 /// One measured call, and the ones made inside it. A call that had not ended

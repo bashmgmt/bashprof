@@ -15,7 +15,7 @@ use std::sync::Arc;
 use hylic::prelude::{treeish, vec_fold, VecHeap, FUSED};
 use serde::{Deserialize, Serialize};
 
-use crate::bashprof::record::{Call, Id, Record};
+use crate::record::{Call, Id, Record};
 use super::records::Placed;
 use super::show;
 

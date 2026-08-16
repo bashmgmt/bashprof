@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::bash::rig::{Micros, Shell, Stamp};
-use crate::bash::stack::Stack;
+use bash_interop::rig::{Micros, Shell, Stamp};
+use bash_interop::stack::Stack;
 
 /// The name a shell gave one of its calls: `$BASHPID` and a count only that
 /// shell advances, which is what makes it unique across a run's process tree.

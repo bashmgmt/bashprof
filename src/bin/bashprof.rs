@@ -13,10 +13,10 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use mb_resolver::bash::rig::{
+use bash_interop::rig::{
     heard, Attended, Doing, Driving, Failure, Layout, Message, Said, Serving, JOINING,
 };
-use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
+use bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
 
 #[derive(Parser)]
 #[command(name = "bashprof", about = "Time a tree of calls in a bash program")]

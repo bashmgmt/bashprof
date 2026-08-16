@@ -1,132 +1,37 @@
-//! The programs' own surface: what `bashcap` and `bashprof` do with a command
-//! line.
+//! The program's own surface: what `bashprof` does with a command line.
 //!
 //! Spawning the built binary is the only way to cover argv parsing, the exit
-//! code it hands back, where the reading is written, and one subcommand
-//! reading what another wrote. What the tools *find* is tested where they are
-//! — `src/bashcap/tests/`, `src/bashprof/tests/`.
+//! code it hands back, where the reading is written, and the serve role a
+//! fixture script starts for itself. What the tool *finds* is tested in
+//! `src/tests`.
 //!
 //! `cargo test --test cli`
 
 use std::process::Command;
 
-#[path = "support/mod.rs"]
-#[allow(dead_code)]
-mod support;
+use bash_interop::rig::JOINING_BASH;
+use bash_interop::scratch::Scripts;
 
-use support::Scripts;
-
-const BASHCAP: &str = env!("CARGO_BIN_EXE_bashcap");
 const BASHPROF: &str = env!("CARGO_BIN_EXE_bashprof");
 
-/// `--trace-calls` asks the subject's shells to record what each call was
-/// passed, and the subject is none the wiser: its own status comes back
-/// unchanged, and it never runs `shopt` itself.
+/// The vendored client half `__fixtures/joined/build.bash` sources. Same
+/// bytes as the core's, asserted, so the copy cannot drift.
+const VENDORED_JOINING: &str = include_str!("../__fixtures/vendor/joining.bash");
+
 #[test]
-fn trace_calls_reaches_the_subject_and_the_status_comes_back() {
-    // Line 1 of the script is where `BASHCAP` fires, line 3 where `step` was called.
-    let scripts = Scripts::of(&[(
-        "build.bash",
-        r#"step() { BASHCAP -BCS:"one step"; }
-
-        step 'a target' --flag
-        exit 7
-        "#,
-    )]);
-    let into = scripts.at("capture.jsonl");
-
-    let ran = Command::new(BASHCAP)
-        .args(["run", "--into"])
-        .arg(&into)
-        .args(["--trace-calls", "--", "bash"])
-        .arg(scripts.at("build.bash"))
-        .output()
-        .expect("the built bashcap");
-
-    assert_eq!(ran.status.code(), Some(7), "the subject's own code, not the wrapper's");
-
-    let shown = Command::new(BASHCAP).arg("show").arg(&into).output().expect("bashcap show");
-    let text = String::from_utf8(shown.stdout).unwrap();
-
-    assert!(text.contains("1 snapshots from 1 shells"), "{text}");
-    assert!(
-        text.contains("step@build.bash:1 ('a target' '--flag')")
-            && text.contains("main@build.bash:3 ()"),
-        "each frame carries its own call site and the arguments it was passed: {text}"
-    );
-    assert!(text.contains("note  one step"), "{text}");
+fn the_vendored_joining_is_the_cores_own() {
+    assert_eq!(VENDORED_JOINING, JOINING_BASH);
 }
 
-/// Without it, a frame says its arguments were never recorded rather than
-/// claiming it was called with none.
-#[test]
-fn without_the_switch_nothing_is_traced() {
-    let scripts = Scripts::of(&[(
-        "build.bash",
-        r#"step() { BASHCAP; }
-
-        step 'a target'
-        "#,
-    )]);
-    let into = scripts.at("capture.jsonl");
-
-    let ran = Command::new(BASHCAP)
-        .args(["run", "--into"])
-        .arg(&into)
-        .args(["--", "bash"])
-        .arg(scripts.at("build.bash"))
-        .output()
-        .expect("the built bashcap");
-    assert_eq!(ran.status.code(), Some(0));
-
-    let shown = Command::new(BASHCAP).arg("show").arg(&into).output().expect("bashcap show");
-    let text = String::from_utf8(shown.stdout).unwrap();
-
-    assert!(text.contains("step@build.bash:1\n"), "the call site alone: {text}");
-    assert!(!text.contains("a target"), "no arguments were recorded to report: {text}");
-}
-
-/// `--reach by-hand` exports the address and nothing else: the script joins
-/// where it says `source "$BC_SESSION"`, and a shell it started before that is
-/// not a shell of the run.
-#[test]
-fn reach_by_hand_leaves_joining_to_the_script() {
-    let scripts = Scripts::of(&[(
-        "build.bash",
-        r#"bash -c 'type BASHCAP >/dev/null 2>&1 && echo "joined without asking" >&2'
-        source "$BC_SESSION"
-        BASHCAP -BCS:"by hand"
-        "#,
-    )]);
-    let into = scripts.at("capture.jsonl");
-
-    let ran = Command::new(BASHCAP)
-        .args(["run", "--reach", "by-hand", "--into"])
-        .arg(&into)
-        .args(["--", "bash"])
-        .arg(scripts.at("build.bash"))
-        .output()
-        .expect("the built bashcap");
-    assert_eq!(ran.status.code(), Some(0));
-    assert!(ran.stderr.is_empty(), "{}", String::from_utf8_lossy(&ran.stderr));
-
-    let shown = Command::new(BASHCAP).arg("show").arg(&into).output().expect("bashcap show");
-    let text = String::from_utf8(shown.stdout).unwrap();
-
-    assert!(text.contains("1 snapshots from 1 shells"), "{text}");
-    assert!(text.contains("note  by hand"), "{text}");
-}
-
-/// Both binaries tell a script how to join, under `--help` of the two verbs
-/// that open a session.
+/// The session-opening verbs tell a script how to join, under `--help`.
 #[test]
 fn help_says_how_a_script_joins() {
-    for (binary, verb) in [(BASHCAP, "run"), (BASHCAP, "serve"), (BASHPROF, "run"), (BASHPROF, "serve")] {
-        let help = Command::new(binary).args([verb, "--help"]).output().expect("--help");
+    for verb in ["run", "serve"] {
+        let help = Command::new(BASHPROF).args([verb, "--help"]).output().expect("--help");
         let text = String::from_utf8(help.stdout).unwrap();
 
-        assert!(text.contains(r#"source "$BC_SESSION""#), "{binary} {verb} --help:\n{text}");
-        assert!(text.contains("BC_START"), "{binary} {verb} --help:\n{text}");
+        assert!(text.contains(r#"source "$BC_SESSION""#), "{verb} --help:\n{text}");
+        assert!(text.contains("BC_START"), "{verb} --help:\n{text}");
     }
 }
 
@@ -305,16 +210,6 @@ fn fixture(relative: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("__fixtures").join(relative)
 }
 
-/// `assets/joining.bash`, where a client would have vendored it. Sourcing it
-/// from where it lives is what keeps the test and the shipped file the same
-/// bytes.
-fn joining() -> String {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("assets/joining.bash")
-        .to_string_lossy()
-        .into_owned()
-}
-
 /// The vendoring contract end to end, over the shipped binary: the same script
 /// builds on its own with the empty hooks, and measures itself when it is
 /// given a server to start. Nothing about the script changes between the two.
@@ -356,48 +251,4 @@ fn a_script_starts_bashprof_for_itself_and_keeps_the_reading() {
         [(0, "build"), (1, "compile"), (2, "link"), (1, "package")],
         "the tree the calls made, indented by how deep they nested:\n{reading}"
     );
-}
-
-/// The same for bashcap, and the same script shape: join, say things, let go.
-/// `BASHCAP` is defined by joining — a client that only ever runs under a
-/// server vendors nothing at all.
-#[test]
-fn a_script_starts_bashcap_for_itself_and_keeps_the_capture() {
-    let scripts = Scripts::of(&[(
-        "work.bash",
-        &format!(
-            r#"set -euo pipefail
-            source {:?}
-            BC_START "$@"
-
-            step() {{ BASHCAP -BCS:"in a served shell"; }}
-            step 'a target'
-            ( BASHCAP -BCS:"from a subshell" )
-
-            BC_LEAVE
-            "#,
-            joining()
-        ),
-    )]);
-    let into = scripts.at("capture.jsonl");
-
-    let ran = Command::new("bash")
-        .arg(scripts.at("work.bash"))
-        .args([BASHCAP, "serve", "--at"])
-        .arg(scripts.at("session.d"))
-        .args(["--verbose", "--trace-calls", "--into"])
-        .arg(&into)
-        .output()
-        .expect("bash");
-
-    let complaints = String::from_utf8(ran.stderr).unwrap();
-    assert_eq!(ran.status.code(), Some(0), "{complaints}");
-    assert!(complaints.contains("bashcap: 2 snapshots"), "the tally is on stderr: {complaints}");
-
-    let shown = Command::new(BASHCAP).arg("show").arg(&into).output().expect("bashcap show");
-    let text = String::from_utf8(shown.stdout).unwrap();
-
-    assert!(text.contains("2 snapshots from 2 shells"), "the subshell is one of its own: {text}");
-    assert!(text.contains("step@work.bash:5 ('a target')"), "--trace-calls reached it: {text}");
-    assert!(text.contains("note  from a subshell"), "{text}");
 }
