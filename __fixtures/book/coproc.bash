@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# ANCHOR: script
 # Owns the session: names the workspace, starts the server, probes, loads,
 # initiates — and leaves by closing the handle coproc left it.
 set -euo pipefail
@@ -20,4 +19,3 @@ BASHPROF_TIMETHIS build build
 declare -- handle="${SERVER[1]}"
 exec {handle}>&-    # let go: what was held is the server's standard input
 wait "$SERVER_PID"  # it sees the session out; its status is this script's
-# ANCHOR_END: script

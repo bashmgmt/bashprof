@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# ANCHOR: script
 # Started as:  bashprof run --reach by-hand --into build.times -- bash by-hand.bash
 set -euo pipefail
 declare -- workspace="${BASHPROF_SESSION:?the workspace, from the tool}"
@@ -15,4 +14,3 @@ BASHPROF_INIT "$workspace"
 
 build() { sleep 0.1; }
 BASHPROF_TIMETHIS build build
-# ANCHOR_END: script

@@ -128,9 +128,8 @@ declare -F BASHPROF_TIMETHIS >/dev/null || BASHPROF_TIMETHIS() { shift; "$@"; }
 
 One function carries the whole call-site choreography, and its frame is
 the point: everything `"$@"` — the measured call — reads is declared in
-it. The word, whole (anchored — `src/words.bash`):
+it. The word, whole, from `src/words.bash`:
 
-<!-- quote: src/words.bash anchor=word -->
 ```bash
 BASHPROF_TIMETHIS() {
     local __BP_label="${1-}"
@@ -159,9 +158,9 @@ tree. And `__BASHPROF_STACK_SHIFT` is reset beside it — see the next
 section. All three reach everything inside `"$@"` because a caller's
 locals are the callee's environment: `bash-interop/docs/scoping.md`.
 
-The BEGIN itself is assembled in a frame of its own:
+The BEGIN itself is assembled in a frame of its own — the rest of the
+same file:
 
-<!-- quote: src/words.bash anchor=begin -->
 ```bash
 __bp_begin() {
     local IFS=' '

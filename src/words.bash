@@ -31,7 +31,6 @@
 #
 # `$?` is read as the first command after the call, which is the only place it
 # survives, and returned after the END has clobbered it.
-# ANCHOR: word
 BASHPROF_TIMETHIS() {
     local __BP_label="${1-}"
     shift || return 125
@@ -49,7 +48,6 @@ BASHPROF_TIMETHIS() {
 
     return "$__BP_rc"
 }
-# ANCHOR_END: word
 
 # The BEGIN, in a frame of its own so `IFS` is taken here and given back —
 # including an `IFS` that was unset — before anything of the subject's runs.
@@ -68,7 +66,6 @@ BASHPROF_TIMETHIS() {
 #
 # `__BP_inside` is not the word's yet: it resolves to the enclosing call's,
 # which is what makes this BEGIN name the caller's call rather than its own.
-# ANCHOR: begin
 __bp_begin() {
     local IFS=' '
 
@@ -81,4 +78,3 @@ __bp_begin() {
     BC_INSTR BASHPROF say TIMETHIS BEGIN id "$__BP_id" inside "${__BP_inside-}" \
         label "$__BP_label" argv "(${*@Q})" "${__BP_stack[@]}"
 }
-# ANCHOR_END: begin
