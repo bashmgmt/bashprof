@@ -27,8 +27,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum What {
-    /// Profile a command line. Every shell finds the session's address in
-    /// BC_SESSION; --reach says whether it has already joined.
+    /// Profile a command line. Every shell finds the session's workspace
+    /// in BC_SESSION; --reach says whether it has already joined.
     #[command(after_long_help = JOINING)]
     Run {
         #[command(flatten)]
@@ -36,7 +36,8 @@ enum What {
 
         /// How the shells find the instrument: bash-env has every
         /// non-interactive bash in the tree join as it starts; by-hand leaves
-        /// it to the scripts, which join with `source "$BC_SESSION"`.
+        /// it to the scripts, which join with
+        /// `source "$BC_SESSION/session.bash"`.
         #[arg(long, value_enum, default_value_t = Reach::BashEnv)]
         reach: Reach,
 
@@ -48,17 +49,18 @@ enum What {
         argv: Vec<String>,
     },
 
-    /// Profile for a bash script that started this process as a coprocess: it
-    /// holds this process's standard input, and reads the address to join from
-    /// its standard output.
+    /// Profile for a bash script that started this process as a coprocess:
+    /// it holds this process's standard input, and lets go to end the
+    /// session. Nothing is written back — the client probes and joins by the
+    /// same directory it names here (`BC_UP`, `BC_ATTACH`).
     #[command(after_long_help = JOINING)]
     Serve {
         #[command(flatten)]
         reading: Reading,
 
-        /// The workspace the session is laid in — the client's choice, so the
-        /// client knows the address, AT/session.bash, before this runs.
-        /// Created if missing, left behind.
+        /// The workspace the session is laid in — the client's to choose
+        /// and to have made, so the client holds the address before this
+        /// runs. Must exist; left behind.
         #[arg(long)]
         at: PathBuf,
     },
@@ -82,19 +84,27 @@ struct Reading {
 /// mapped onto the run's environment closure.
 #[derive(Copy, Clone, ValueEnum)]
 enum Reach {
-    /// BC_SESSION and BASH_ENV name the address: every non-interactive bash
+    /// BC_SESSION carries the workspace and BASH_ENV the session file:
+    /// every non-interactive bash
     /// in the tree joins as it starts.
     BashEnv,
 
-    /// BC_SESSION alone: a script joins where it says `source "$BC_SESSION"`.
+    /// BC_SESSION alone: a script joins where it says
+    /// `source "$BC_SESSION/session.bash"`.
     ByHand,
+}
+
+/// The tools' convention: the workspace directory as `BC_SESSION`,
+/// spelled here, consulted by nothing in the core.
+fn session(at: &Layout) -> (OsString, OsString) {
+    (OsString::from("BC_SESSION"), OsString::from(at.text()))
 }
 
 impl Reach {
     fn environment(self, at: &Layout) -> Vec<(OsString, OsString)> {
         match self {
-            Self::BashEnv => vec![at.bc_session(), at.bash_env()],
-            Self::ByHand => vec![at.bc_session()],
+            Self::BashEnv => vec![session(at), at.bash_env()],
+            Self::ByHand => vec![session(at)],
         }
     }
 }

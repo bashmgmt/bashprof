@@ -7,7 +7,7 @@ call it belongs to, so the tree travels on the wire.
 
 ```
 bashprof run   [--reach bash-env|by-hand] --into build.times [--output human|tree|tree-with-err|raw] -- make test
-bashprof serve --at session.d --into build.times   # started BY a script, via BC_START
+bashprof serve --at session.d --into build.times   # started BY a script: BC_START, BC_UP, BC_ATTACH
 ```
 
 Built on [`bash-interop`](../bash-interop); the word a client vendors is

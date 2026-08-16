@@ -14,7 +14,7 @@
 //! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() -> Result<(), bash_interop::rig::Failure> {
 //! let ran = BashProf
-//!     .run(&["bash", "build.bash"], |at| vec![at.bc_session(), at.bash_env()])
+//!     .run(&["bash", "build.bash"], |at| vec![at.bash_env()])
 //!     .await?;
 //!
 //! // Two readings, and each hands back what it did read when it refuses.
@@ -52,14 +52,13 @@ pub(crate) const WORDS: &str = include_str!("../assets/bashprof.bash");
 /// `__bp_begin` and `__bp_end`, which are what make that word measure.
 pub(crate) const EFFECT: &str = include_str!("effect.bash");
 
-/// The join: the words speak under `BASHPROF`, and `$1` is the workspace the
-/// invocation hands the rig's bash.
-const JOIN: &str = "BC_JOIN BASHPROF \"$1\"\n";
-
 /// The bash a rig hands the subject, for any rig that wants what bashprof
-/// measures. The frame walk comes with it, since a measurement reports one.
-pub fn instrument() -> String {
-    stack::with_walk(&[WORDS, EFFECT, JOIN])
+/// measures, generated against the settled workspace: the words speak under
+/// `BASHPROF`, and the join carries the coordinate baked in, quoted. The
+/// frame walk comes with it, since a measurement reports one.
+pub fn instrument(at: &Layout) -> String {
+    let join = format!("BC_JOIN BASHPROF {}\n", bash_strings::emit_scalar(at.text()));
+    stack::with_walk(&[WORDS, EFFECT, &join])
 }
 
 pub use reading::{recorded, Profile, Recorded, Span, Unfinished, Unread};
@@ -78,8 +77,8 @@ pub struct BashProf;
 impl Rig for BashProf {
     type Reaction = Vec<Message>;
 
-    fn bash(&self) -> String {
-        instrument()
+    fn bash(&self, at: &Layout) -> String {
+        instrument(at)
     }
 
     async fn joined(&self, _at: &Layout, _shell: Arc<Shell>) -> Result<Vec<Message>, Failure> {

@@ -20,6 +20,8 @@ if (( $# > 0 )); then
     source "$__root/__fixtures/vendor/joining.bash"
     __workspace="$(mktemp -d)"
     BC_START "$@" --at "$__workspace"
+    until BC_UP "$__workspace"; do sleep 0.01; done
+    BC_ATTACH "$__workspace"
 fi
 
 compile() { sleep 0.01; BASHPROF_TIMETHIS link link; }

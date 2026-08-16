@@ -22,7 +22,7 @@ bashprof serve --at DIR --into FILE [--output …]
 | | who starts the shells | how they are reached | its exit code |
 |---|---|---|---|
 | `run` | the tool, from the command line it was given | `BC_SESSION` in the environment always; `--reach bash-env` (the default) also `BASH_ENV`, so the whole process tree joins; `--reach by-hand` leaves it to the scripts | the subject's |
-| `serve` | a bash script, which named the workspace (`--at`, required) and started this process as a coprocess | its own choice — the address is `<at>/session.bash`; the line on stdout says the session is laid | its own: 0, or 1 if the reading did not come out |
+| `serve` | a bash script, which named and made the workspace (`--at`, required, existing) and started this process as a coprocess | its own choice — the workspace is the address; the join fifo in it says the session is up (`BC_UP`), and the script attaches by the same dir (`BC_ATTACH`) | its own: 0, or 1 if the reading did not come out |
 
 `serve` is the shipped half of what `assets/joining.bash` starts —
 `BC_START bashprof serve --at prof.d --into build.times`. Nothing about the reading changes
