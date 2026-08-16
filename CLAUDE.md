@@ -4,7 +4,7 @@ A thin user of `bash-interop`: the instrument (bash injected into every
 shell), the rig impl, the reading, and the `bashprof` binary. The words a client
 vendors are `assets/bashprof.bash`; `__fixtures/vendor/joining.bash` is the
 vendored client half, asserted same-bytes against `rig::JOINING_BASH` in
-`tests/cli.rs`. Reference: `KB/bashprof.md`.
+`tests/cli.rs`. Reference: `docs/bashprof.md`.
 
 ```bash
 cargo test --lib -- --test-threads=1

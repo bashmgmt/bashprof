@@ -11,5 +11,5 @@ bashprof serve --at session.d --into build.times   # started BY a script: BC_STA
 ```
 
 Built on [`bash-interop`](../bash-interop); the word a client vendors is
-`assets/bashprof.bash`, and the reference is `KB/bashprof.md`.
+`assets/bashprof.bash`, and the reference is [`docs/`](docs/README.md).
 `__fixtures/joined/build.bash` is the whole client story in one file.

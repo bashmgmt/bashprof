@@ -56,7 +56,7 @@ is the same reading through `Profile`'s `Display`, which does print both.
 
 Bashprof also prints one line on stderr per source path a frame names and does
 not have. Not a failure — see
-`bash-interop/KB/stack.md#where-a-source-path-lands` — but a run whose reading is
+`bash-interop/docs/stack.md#where-a-source-path-lands` — but a run whose reading is
 meant to resolve names a workspace it keeps.
 
 ## The chain
@@ -116,7 +116,7 @@ library, for a caller assembling a report of its own.
 
 Keeping a script's call sites runnable without the tool is the client's own,
 and `assets/bashprof.bash` is what it vendors to do it — see
-`bash-interop/KB/vendoring.md`.
+`bash-interop/docs/vendoring.md`.
 
 ## The layers are aliases
 
@@ -125,7 +125,7 @@ A call carries three declarations, and each is a layer of its own. They are
 skip, one every call measured below it carries in its own payload, and one more
 call per measurement. An alias is the same text in the same frame, so the
 layers separate for a reader and cost nothing. What that saves is measured in
-`bash-interop/KB/measurements.md#what-a-function-layer-costs-an-instrument`.
+`bash-interop/docs/measurements.md#what-a-function-layer-costs-an-instrument`.
 
 | layer | declares | read by |
 |---|---|---|
@@ -135,7 +135,7 @@ layers separate for a reader and cost nothing. What that saves is measured in
 
 Every one of them declares in the frame of the word the subject called, which
 is what puts it where the rest of that word and everything it runs will read
-it — and what a fork inherits. See `bash-interop/KB/scoping.md`.
+it — and what a fork inherits. See `bash-interop/docs/scoping.md`.
 
 ```bash
 alias __BASHPROF_TAKE_STACK='
@@ -212,7 +212,7 @@ where the names are read.
 
 The reaction is `Vec<Message>`, the shipped one — bashprof adds nothing to it, and
 its rig is `bash` and `joined` alone. `recorded()` takes `&[Said]`, which is
-what `bash-interop/KB/rig.md#what-a-run-hands-back` makes of the per-shell foldings: a
+what `bash-interop/docs/rigs.md#what-a-run-hands-back` makes of the per-shell foldings: a
 message and the shell that sent it, since a walk cannot be read without one.
 Nothing is paired by position and nothing depends on the order they arrived in.
 
@@ -256,7 +256,7 @@ every node carries them anyway, because **a stack is not the tree and cannot be
 read off it**: an unmeasured function between two measured calls is a frame and
 not a node.
 
-`Call` and `Span` each hold one `bash-interop/KB/stack.md`, from the call site
+`Call` and `Span` each hold one `bash-interop/docs/stack.md`, from the call site
 outward, with one frame of the instrument's per enclosing measurement:
 
 ```
@@ -267,7 +267,7 @@ inner   mid@build.bash:2  between@build.bash:3  BASHPROF_TIMETHIS  main@build.ba
 site, which is what tells two calls made from one function apart, and what
 `human` prints. At one frame per level a walk 100 deep is a 17 kB payload in
 five frames — see
-`bash-interop/KB/measurements.md#what-a-function-layer-costs-an-instrument`
+`bash-interop/docs/measurements.md#what-a-function-layer-costs-an-instrument`
 for what the same instrument costs when its layers are functions instead.
 
 ## Time a span had to itself
@@ -299,7 +299,7 @@ duration.
 
 ## See also
 
-- `bash-interop/KB/scoping.md` — the frame `__BP_inside` is declared in, and why
-- `bash-interop/KB/stack.md` — the frame walk both instruments share
-- `bash-interop/KB/wire.md#messages` — the provenance every message carries already
-- `bash-interop/KB/rig.md#what-a-reaction-is-for` — the reaction this one keeps
+- `bash-interop/docs/scoping.md` — the frame `__BP_inside` is declared in, and why
+- `bash-interop/docs/stack.md` — the frame walk both instruments share
+- `bash-interop/docs/wire.md#messages` — the provenance every message carries already
+- `bash-interop/docs/rigs.md#what-a-reaction-is-for` — the reaction this one keeps
