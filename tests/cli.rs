@@ -20,7 +20,7 @@ fn help_says_how_a_script_joins() {
         let help = Command::new(BASHPROF).args([verb, "--help"]).output().expect("--help");
         let text = String::from_utf8(help.stdout).unwrap();
 
-        assert!(text.contains(r#"BASHPROF_INIT "$BC_SESSION""#), "{verb} --help:\n{text}");
+        assert!(text.contains(r#"BASHPROF_INIT "$BASHPROF_SESSION""#), "{verb} --help:\n{text}");
         assert!(text.contains("coproc SERVER"), "{verb} --help:\n{text}");
         assert!(text.contains(r#"source "$workspace/prelude.bash""#), "{verb} --help:\n{text}");
     }

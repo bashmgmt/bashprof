@@ -14,9 +14,13 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use bash_interop::rig::{
-    heard, Attended, Doing, Driving, Failure, Layout, Message, Provision, Said, Serving, JOINING,
+    heard, Attended, Doing, Driving, Failure, Layout, Message, Provision, Said, Serving,
 };
 use bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
+
+/// Every way a script joins this tool's sessions, in this tool's words —
+/// appended to the session-opening verbs' `--help`.
+const JOINING: &str = include_str!("joining.txt");
 
 #[derive(Parser)]
 #[command(name = "bashprof", about = "Time a tree of calls in a bash program")]
@@ -28,7 +32,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum What {
     /// Profile a command line. Every shell finds the session's workspace
-    /// in BC_SESSION; --reach says whether it has already joined.
+    /// in BASHPROF_SESSION; --reach says whether it has already joined.
     #[command(after_long_help = JOINING)]
     Run {
         #[command(flatten)]
@@ -37,7 +41,7 @@ enum What {
         /// How the shells find the instrument: bash-env has every
         /// non-interactive bash in the tree join as it starts; by-hand leaves
         /// initiation to the scripts, which join with
-        /// `BASHPROF_INIT "$BC_SESSION"`.
+        /// `BASHPROF_INIT "$BASHPROF_SESSION"`.
         #[arg(long, value_enum, default_value_t = Reach::BashEnv)]
         reach: Reach,
 
@@ -84,21 +88,21 @@ struct Reading {
 /// mapped onto the run's environment closure.
 #[derive(Copy, Clone, ValueEnum)]
 enum Reach {
-    /// BC_SESSION carries the workspace and BASH_ENV a provisioned file
+    /// BASHPROF_SESSION carries the workspace and BASH_ENV a provisioned file
     /// that initiates: every non-interactive bash
     /// in the tree joins as it starts.
     BashEnv,
 
-    /// The provisioned file only defines, and BC_SESSION carries the
-    /// workspace: a script joins where it says
-    /// `BASHPROF_INIT "$BC_SESSION"`.
+    /// The provisioned file only defines, and BASHPROF_SESSION carries
+    /// the workspace: a script joins where it says
+    /// `BASHPROF_INIT "$BASHPROF_SESSION"`.
     ByHand,
 }
 
-/// The tools' convention: the workspace directory as `BC_SESSION`,
+/// This tool's convention: the workspace directory as `BASHPROF_SESSION`,
 /// spelled here, consulted by nothing in the core.
 fn session(at: &Layout) -> (OsString, OsString) {
-    (OsString::from("BC_SESSION"), OsString::from(at.text()))
+    (OsString::from("BASHPROF_SESSION"), OsString::from(at.text()))
 }
 
 impl Reach {

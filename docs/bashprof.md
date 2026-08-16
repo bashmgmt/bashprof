@@ -21,7 +21,7 @@ bashprof serve --at DIR --into FILE [--output …]
 
 | | who starts the shells | how they are reached | its exit code |
 |---|---|---|---|
-| `run` | the tool, from the command line it was given | `BC_SESSION` in the environment always; `--reach bash-env` (the default) also `BASH_ENV`, so the whole process tree joins; `--reach by-hand` leaves it to the scripts | the subject's |
+| `run` | the tool, from the command line it was given | `BASHPROF_SESSION` in the environment always; `--reach bash-env` (the default) also `BASH_ENV`, so the whole process tree joins; `--reach by-hand` leaves it to the scripts | the subject's |
 | `serve` | a bash script, which named and made the workspace (`--at`, required, existing) and started this process as a coprocess | its own choice — the workspace is the address; the join fifo in it says the session is up, and the script sources the laid files and initiates by the same dir (`BASHPROF_INIT`) | its own: 0, or 1 if the reading did not come out |
 
 `serve` is the shipped half of a client's own coprocess —
@@ -29,8 +29,8 @@ bashprof serve --at DIR --into FILE [--output …]
 Nothing about the reading changes
 between the two, and `__fixtures/joined/build.bash` runs under both plus under
 no server at all, which is the vendoring contract end to end
-([tests/cli.rs](../../../tests/cli.rs)). `run --help` and `serve --help` end
-with `JOINING`, every way a script joins.
+([tests/cli.rs](../tests/cli.rs)). `run --help` and `serve --help` end
+with every way a script joins, in this tool's words.
 
 ```rust
 pub struct BashProf;   // drive it: BashProf.run(argv, |at| …); or serve it
@@ -302,5 +302,5 @@ duration.
 
 - `bash-interop/docs/scoping.md` — the frame `__BP_inside` is declared in, and why
 - `bash-interop/docs/stack.md` — the frame walk both instruments share
-- `bash-interop/docs/wire.md#messages` — the provenance every message carries already
-- `bash-interop/docs/rigs.md#what-a-reaction-is-for` — the reaction this one keeps
+- `bash-interop/docs/wire.md#what-a-line-is` — the provenance every message carries already
+- `bash-interop/docs/rigs.md` — the reaction this one keeps
