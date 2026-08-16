@@ -240,3 +240,51 @@ fn a_script_starts_bashprof_for_itself_and_keeps_the_reading() {
         "the tree the calls made, indented by how deep they nested:\n{reading}"
     );
 }
+
+/// The book's three complete ways in, byte for byte: `bash-interop`'s
+/// joining.md and serving.md quote `__fixtures/book/` through the anchor
+/// sync, and this is what makes the printed scripts run.
+#[test]
+fn the_books_scripts_run_as_printed() {
+    let scripts = Scripts::of(&[]);
+
+    let into = scripts.at("provisioned.times");
+    let ran = Command::new(BASHPROF)
+        .args(["run", "--into"])
+        .arg(&into)
+        .args(["--", "bash"])
+        .arg(fixture("book/provisioned.bash"))
+        .output()
+        .expect("bashprof");
+    assert_eq!(ran.status.code(), Some(0), "{}", String::from_utf8_lossy(&ran.stderr));
+    assert!(std::fs::read_to_string(&into).expect("the reading").contains("build"));
+
+    let into = scripts.at("by-hand.times");
+    let ran = Command::new(BASHPROF)
+        .args(["run", "--reach", "by-hand", "--into"])
+        .arg(&into)
+        .args(["--", "bash"])
+        .arg(fixture("book/by-hand.bash"))
+        .output()
+        .expect("bashprof");
+    assert_eq!(ran.status.code(), Some(0), "{}", String::from_utf8_lossy(&ran.stderr));
+    assert!(std::fs::read_to_string(&into).expect("the reading").contains("build"));
+
+    let bin_dir = std::path::Path::new(BASHPROF).parent().expect("the target dir");
+    let path = std::env::join_paths(
+        std::iter::once(bin_dir.to_path_buf())
+            .chain(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())),
+    )
+    .expect("PATH");
+    let marker = scripts.at("cwd");
+    let dir = marker.parent().expect("the scripts dir");
+    let ran = Command::new("bash")
+        .arg(fixture("book/coproc.bash"))
+        .env("PATH", path)
+        .current_dir(dir)
+        .output()
+        .expect("bash");
+    assert_eq!(ran.status.code(), Some(0), "{}", String::from_utf8_lossy(&ran.stderr));
+    let reading = std::fs::read_to_string(dir.join("build.times")).expect("the reading");
+    assert!(reading.contains("build"));
+}

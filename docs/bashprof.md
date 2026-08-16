@@ -124,34 +124,66 @@ declare -F BASHPROF_TIMETHIS >/dev/null || BASHPROF_TIMETHIS() { shift; "$@"; }
 
 — one line of its own, unshipped.
 
-## The layers are aliases
+## The word, and the frame the subject reads
 
-A call carries three declarations, and each is a layer of its own. They are
-**aliases, not functions**: a function would be a frame — one the walk has to
-skip, one every call measured below it carries in its own payload, and one more
-call per measurement. An alias is the same text in the same frame, so the
-layers separate for a reader and cost nothing. What that saves is measured in
-`bash-interop/docs/measurements.md#what-a-function-layer-costs-an-instrument`.
+One function carries the whole call-site choreography, and its frame is
+the point: everything `"$@"` — the measured call — reads is declared in
+it. The word, whole (anchored — `src/words.bash`):
 
-| layer | declares | read by |
-|---|---|---|
-| `__BASHPROF_TAKE_STACK` | `__BP_stack` — the call site's walk | the BEGIN |
-| `__BASHPROF_TAKE_NAME` | `__BP_id` — this call's name | the BEGIN, and the END |
-| `__BASHPROF_HAND_ON` | `__BP_inside` — its own name, for what it runs | every call made inside it |
-
-Every one of them declares in the frame of the word the subject called, which
-is what puts it where the rest of that word and everything it runs will read
-it — and what a fork inherits. See `bash-interop/docs/scoping.md`.
-
+<!-- quote: src/words.bash anchor=word -->
 ```bash
-alias __BASHPROF_TAKE_STACK='
-    local -a __BP_stack=()
-    __bc_stack __BP_stack $(( 2 + ${__BASHPROF_STACK_SHIFT:-0} ))'
+BASHPROF_TIMETHIS() {
+    local __BP_label="${1-}"
+    shift || return 125
+
+    local __BP_id=
+    __bp_begin "$@" || return $?
+
+    local __BP_inside="$__BP_id"
+    declare -- __BASHPROF_STACK_SHIFT=
+
+    "$@"
+    local __BP_rc=$?
+
+    BC_INSTR BASHPROF say TIMETHIS END id "$__BP_id" status "$__BP_rc" || return $?
+
+    return "$__BP_rc"
+}
 ```
 
-The 2 is `__bc_stack`'s own frame and the frame the alias expands into, so the
-walk points at the subject rather than at the instrument. It holds wherever the
-alias is used, as long as it is used in the body of the word the subject calls.
+Three declarations in that frame do quiet work. `__BP_id` is declared
+empty and filled by `__bp_begin`, so the END can name the same call.
+`__BP_inside` takes this call's name only *after* the BEGIN went out —
+the BEGIN read the enclosing call's, which is what places this one in the
+tree. And `__BASHPROF_STACK_SHIFT` is reset beside it — see the next
+section. All three reach everything inside `"$@"` because a caller's
+locals are the callee's environment: `bash-interop/docs/scoping.md`.
+
+The BEGIN itself is assembled in a frame of its own:
+
+<!-- quote: src/words.bash anchor=begin -->
+```bash
+__bp_begin() {
+    local IFS=' '
+
+    local -a __BP_stack=()
+    __bc_stack __BP_stack $(( 3 + ${__BASHPROF_STACK_SHIFT:-0} ))
+
+    __BP_made=$(( ${__BP_made:-0} + 1 ))
+    __BP_id="$BASHPID.$__BP_made"
+
+    BC_INSTR BASHPROF say TIMETHIS BEGIN id "$__BP_id" inside "${__BP_inside-}" \
+        label "$__BP_label" argv "(${*@Q})" "${__BP_stack[@]}"
+}
+```
+
+The separate frame is load-bearing: every join in it is `[*]@Q` under a
+`local IFS=' '`, and that local must die before `"$@"` runs — the subject
+has its own `IFS` back, unset included, before anything measured runs.
+The 3 counts `__bc_stack`'s frame, `__bp_begin`'s and the word's, so the
+walk points at the subject; a wrapper's declared shift adds to it. What a
+*stack* of function layers would cost instead is measured in
+`bash-interop/docs/measurements.md#what-a-function-layer-costs-an-instrument`.
 
 ## `$__BASHPROF_STACK_SHIFT`
 
@@ -170,7 +202,7 @@ Read through `:-0` because an **unset** name inside `(( ))` is an error under
 `set -u` while an **empty** one is zero — so a subject that never heard of it
 pays one parameter expansion and adds nothing.
 
-`__BASHPROF_HAND_ON` clears it, in the same breath as handing the name down:
+The word clears it, in the same breath as handing the name down:
 
 ```bash
 local __BP_inside="$__BP_id"

@@ -49,9 +49,6 @@ use bash_interop::stack;
 /// `BASHPROF_TIMETHIS`, the word a call site says.
 pub(crate) const WORDS: &str = include_str!("words.bash");
 
-/// `__bp_begin` and `__bp_end`, which are what make that word measure.
-pub(crate) const EFFECT: &str = include_str!("effect.bash");
-
 /// The definitions a rig hands the subject, for any rig that wants what
 /// bashprof measures: the words speak under `BASHPROF`, the frame walk comes
 /// with them since a measurement reports one, and `BASHPROF_INIT <dir>` is
@@ -62,7 +59,7 @@ BASHPROF_INIT() {
     BC_JOIN BASHPROF "${1:?the session workspace}"
 }
 "#;
-    stack::with_walk(&[WORDS, EFFECT, INIT])
+    stack::with_walk(&[WORDS, INIT])
 }
 
 /// The standard initiation: `BASHPROF_INIT '<dir>'`. Data — written into a
