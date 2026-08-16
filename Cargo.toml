@@ -10,8 +10,8 @@ categories = ["development-tools::profiling", "command-line-utilities"]
 exclude = ["KB/**", ".plans/**"]
 
 [dependencies]
-bash-interop = "0.1"
-bash-strings = "0.1"
+bash-interop = "*"
+bash-strings = "*"
 hylic = "0.8"
 either = "1.15.0"
 serde = { version = "1.0", features = ["derive"] }
