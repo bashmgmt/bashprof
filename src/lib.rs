@@ -15,7 +15,7 @@
 //! # async fn main() -> Result<(), bash_interop::rig::Failure> {
 //! let ran = BashProf
 //!     .run(&["bash", "build.bash"], |at| {
-//!         Ok(vec![at.bash_env(Provision::Joining(&BashProf.joining(at)))?])
+//!         Ok(vec![at.bash_env(Provision::Joining(&bashprof::joining(at)))?])
 //!     })
 //!     .await?;
 //!
@@ -91,10 +91,6 @@ impl Rig for BashProf {
 
     fn bash(&self, _at: &Layout) -> String {
         instrument()
-    }
-
-    fn joining(&self, at: &Layout) -> String {
-        joining(at)
     }
 
     async fn joined(&self, _at: &Layout, _shell: Arc<Shell>) -> Result<Vec<Message>, Failure> {
