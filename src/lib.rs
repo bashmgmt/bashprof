@@ -8,12 +8,14 @@
 //! on the wire rather than being reconstructed from it.
 //!
 //! ```no_run
-//! use mb_resolver::bash::rig::{heard, Driving, Reached, Reaching};
+//! use mb_resolver::bash::rig::{heard, Driving};
 //! use mb_resolver::bashprof::{recorded, BashProf, Profile};
 //!
 //! # #[tokio::main(flavor = "current_thread")]
 //! # async fn main() -> Result<(), mb_resolver::bash::rig::Failure> {
-//! let ran = Reached { rig: BashProf, reaching: Reaching::BashEnv }.run(&["bash", "build.bash"]).await?;
+//! let ran = BashProf
+//!     .run(&["bash", "build.bash"], |at| vec![at.bc_session(), at.bash_env()])
+//!     .await?;
 //!
 //! // Two readings, and each hands back what it did read when it refuses.
 //! let forest = recorded(&heard(&ran.shells)).unwrap_or_else(|unread| unread.resolved);
@@ -39,7 +41,7 @@ pub(crate) mod record;
 
 use std::sync::Arc;
 
-use crate::bash::rig::{Failure, Layout, Message, Rig, Serving, Shell};
+use crate::bash::rig::{Driving, Failure, Layout, Message, Rig, Serving, Shell};
 use crate::bash::stack;
 
 /// `BASHPROF_TIMETHIS`, the word a call site says. Shipped as an asset so a
@@ -86,6 +88,7 @@ impl Rig for BashProf {
 }
 
 /// A measurement is an interval between two messages, so nothing in the
-/// reading depends on who started the shells that sent them: serve it, or
-/// drive it as [`Reached`](crate::bash::rig::Reached).
+/// reading depends on who started the shells that sent them.
+impl Driving for BashProf {}
+
 impl Serving for BashProf {}

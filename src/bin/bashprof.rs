@@ -8,12 +8,13 @@
 //! the interval between two messages either way — which is why both take the
 //! same options, from the same type.
 
+use std::ffi::OsString;
 use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use mb_resolver::bash::rig::{
-    heard, Attended, Doing, Driving, Failure, Message, Reached, Reaching, Said, Serving, JOINING,
+    heard, Attended, Doing, Driving, Failure, Layout, Message, Said, Serving, JOINING,
 };
 use mb_resolver::bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
 
@@ -36,8 +37,8 @@ enum What {
         /// How the shells find the instrument: bash-env has every
         /// non-interactive bash in the tree join as it starts; by-hand leaves
         /// it to the scripts, which join with `source "$BC_SESSION"`.
-        #[arg(long, value_enum, default_value_t = Reaching::BashEnv)]
-        reach: Reaching,
+        #[arg(long, value_enum, default_value_t = Reach::BashEnv)]
+        reach: Reach,
 
         /// The wrapped command, program included — `bash build.bash`, or
         /// `make test`, whose own shells join too. Everything from the first
@@ -75,6 +76,27 @@ struct Reading {
     /// How far the run is read before it is written, and in what.
     #[arg(long, value_enum, default_value_t = Output::Human)]
     output: Output,
+}
+
+/// How the subject's shells find the session — this tool's vocabulary,
+/// mapped onto the run's environment closure.
+#[derive(Copy, Clone, ValueEnum)]
+enum Reach {
+    /// BC_SESSION and BASH_ENV name the address: every non-interactive bash
+    /// in the tree joins as it starts.
+    BashEnv,
+
+    /// BC_SESSION alone: a script joins where it says `source "$BC_SESSION"`.
+    ByHand,
+}
+
+impl Reach {
+    fn environment(self, at: &Layout) -> Vec<(OsString, OsString)> {
+        match self {
+            Self::BashEnv => vec![at.bc_session(), at.bash_env()],
+            Self::ByHand => vec![at.bc_session()],
+        }
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, ValueEnum)]
@@ -169,14 +191,13 @@ async fn perform(what: &What) -> i32 {
 /// is indistinguishable from an unprofiled one. Where the subject succeeded
 /// and bashprof could not write what was asked for, the failure is bashprof's
 /// and so is the status.
-async fn run(reading: &Reading, reaching: Reaching, argv: &[String]) -> i32 {
+async fn run(reading: &Reading, reach: Reach, argv: &[String]) -> i32 {
     if let Err(why) = reading.claim() {
         eprintln!("bashprof: {why}");
         return 1;
     }
 
-    let reached = Reached { rig: BashProf, reaching };
-    match reached.run(argv).await {
+    match BashProf.run(argv, |at| reach.environment(at)).await {
         Err(why) => {
             eprintln!("bashprof: {why}");
             1

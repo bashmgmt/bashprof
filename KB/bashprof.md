@@ -32,7 +32,7 @@ no server at all, which is the vendoring contract end to end
 with `JOINING`, every way a script joins.
 
 ```rust
-pub struct BashProf;   // drive it as Reached { rig: BashProf, reaching }, or serve it
+pub struct BashProf;   // drive it: BashProf.run(argv, |at| …); or serve it
 ```
 
 `--output` chooses **how far the run is read**, and in what:
