@@ -25,7 +25,7 @@ bashprof serve --at DIR --into FILE [--output …]
 | `serve` | a bash script, which named and made the workspace (`--at`, required, existing) and started this process as a coprocess | its own choice — the workspace is the address; the join fifo in it says the session is up (`BC_UP`), and the script loads and initiates by the same dir (`BC_LOAD`, `BASHPROF_INIT`) | its own: 0, or 1 if the reading did not come out |
 
 `serve` is the shipped half of what `assets/joining.bash` starts —
-`BC_START bashprof serve --at prof.d --into build.times`. Nothing about the reading changes
+`BC_START bashprof serve --at "$PWD/prof.d" --into build.times`. Nothing about the reading changes
 between the two, and `__fixtures/joined/build.bash` runs under both plus under
 no server at all, which is the vendoring contract end to end
 ([tests/cli.rs](../../../tests/cli.rs)). `run --help` and `serve --help` end
