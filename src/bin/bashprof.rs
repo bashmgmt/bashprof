@@ -51,8 +51,8 @@ enum What {
 
     /// Profile for a bash script that started this process as a coprocess:
     /// it holds this process's standard input, and lets go to end the
-    /// session. Nothing is written back — the client probes and joins by the
-    /// same directory it names here (`BC_UP`, `BC_ATTACH`).
+    /// session. Nothing is written back — the client probes, loads and
+    /// joins by the same directory it names here.
     #[command(after_long_help = JOINING)]
     Serve {
         #[command(flatten)]
@@ -230,8 +230,8 @@ async fn run(reading: &Reading, reach: Reach, argv: &[String]) -> i32 {
 }
 
 /// Nothing here starts a shell or ends one, so there is no subject's status to
-/// hand back — only whether the reading came out whole. The client's `BC_LEAVE`
-/// waits for this process, so that status is what its own `set -e` sees.
+/// hand back — only whether the reading came out whole. The client's `wait`
+/// collects this process, so that status is what its own `set -e` sees.
 async fn serve(reading: &Reading, at: &std::path::Path) -> Result<(), Failure> {
     reading.claim()?;
 

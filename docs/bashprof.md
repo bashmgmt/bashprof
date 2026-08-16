@@ -22,10 +22,11 @@ bashprof serve --at DIR --into FILE [--output …]
 | | who starts the shells | how they are reached | its exit code |
 |---|---|---|---|
 | `run` | the tool, from the command line it was given | `BC_SESSION` in the environment always; `--reach bash-env` (the default) also `BASH_ENV`, so the whole process tree joins; `--reach by-hand` leaves it to the scripts | the subject's |
-| `serve` | a bash script, which named and made the workspace (`--at`, required, existing) and started this process as a coprocess | its own choice — the workspace is the address; the join fifo in it says the session is up (`BC_UP`), and the script loads and initiates by the same dir (`BC_LOAD`, `BASHPROF_INIT`) | its own: 0, or 1 if the reading did not come out |
+| `serve` | a bash script, which named and made the workspace (`--at`, required, existing) and started this process as a coprocess | its own choice — the workspace is the address; the join fifo in it says the session is up, and the script sources the laid files and initiates by the same dir (`BASHPROF_INIT`) | its own: 0, or 1 if the reading did not come out |
 
-`serve` is the shipped half of what `assets/joining.bash` starts —
-`BC_START bashprof serve --at "$PWD/prof.d" --into build.times`. Nothing about the reading changes
+`serve` is the shipped half of a client's own coprocess —
+`coproc SERVER { bashprof serve --at "$PWD/prof.d" --into build.times; }`.
+Nothing about the reading changes
 between the two, and `__fixtures/joined/build.bash` runs under both plus under
 no server at all, which is the vendoring contract end to end
 ([tests/cli.rs](../../../tests/cli.rs)). `run --help` and `serve --help` end

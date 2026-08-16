@@ -9,19 +9,9 @@
 
 use std::process::Command;
 
-use bash_interop::rig::JOINING_BASH;
 use bash_interop::scratch::Scripts;
 
 const BASHPROF: &str = env!("CARGO_BIN_EXE_bashprof");
-
-/// The vendored client half `__fixtures/joined/build.bash` sources. Same
-/// bytes as the core's, asserted, so the copy cannot drift.
-const VENDORED_JOINING: &str = include_str!("../__fixtures/vendor/joining.bash");
-
-#[test]
-fn the_vendored_joining_is_the_cores_own() {
-    assert_eq!(VENDORED_JOINING, JOINING_BASH);
-}
 
 /// The session-opening verbs tell a script how to join, under `--help`.
 #[test]
@@ -31,8 +21,8 @@ fn help_says_how_a_script_joins() {
         let text = String::from_utf8(help.stdout).unwrap();
 
         assert!(text.contains(r#"BASHPROF_INIT "$BC_SESSION""#), "{verb} --help:\n{text}");
-        assert!(text.contains("BC_START"), "{verb} --help:\n{text}");
-        assert!(text.contains("BC_LOAD"), "{verb} --help:\n{text}");
+        assert!(text.contains("coproc SERVER"), "{verb} --help:\n{text}");
+        assert!(text.contains(r#"source "$workspace/prelude.bash""#), "{verb} --help:\n{text}");
     }
 }
 

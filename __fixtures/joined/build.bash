@@ -4,24 +4,24 @@
 #     build.bash                                     # just build
 #     build.bash bashprof serve --into build.times   # build, and keep the timings
 #
-# A shipped client vendors copies of the two files below; the vendored joining
-# is asserted against the core's in tests/cli.rs, so the copy cannot drift.
+# A shipped client vendors a copy of the words file below; this fixture,
+# living beside the tool, sources the asset itself.
 set -euo pipefail
 
 __root="${BASH_SOURCE[0]%/*}/../.."
 
-# The word, and empty hooks for when nothing is there to measure. Joining
-# replaces them with the ones that do — which is why the guard comes first and
-# `BC_START` after it.
+# The word, and empty hooks for when nothing is there to measure. Loading
+# replaces them with the ones that do — which is why the guard comes first
+# and the load after it.
 source "$__root/assets/bashprof.bash"
 declare -F __bp_begin >/dev/null || { __bp_begin() { :; }; __bp_end() { :; }; }
 
 if (( $# > 0 )); then
-    source "$__root/__fixtures/vendor/joining.bash"
     declare -- workspace="$(mktemp -d)"
-    BC_START "$@" --at "$workspace"
-    until BC_UP "$workspace"; do sleep 0.01; done
-    BC_LOAD "$workspace"
+    coproc SERVER { "$@" --at "$workspace"; }
+    until [[ -p "$workspace/join" ]]; do sleep 0.01; done
+    source "$workspace/prelude.bash"
+    source "$workspace/rig.bash"
     BASHPROF_INIT "$workspace"
 fi
 
@@ -41,6 +41,8 @@ echo built
 # the last shell has let go, and this is the client letting go. The workspace
 # was this script's to name, so it is this script's to remove.
 if (( $# > 0 )); then
-    BC_LEAVE
+    declare -- handle="${SERVER[1]}"
+    exec {handle}>&-
+    wait "$SERVER_PID"
     rm -rf "$workspace"
 fi
