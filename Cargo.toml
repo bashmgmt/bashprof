@@ -10,8 +10,8 @@ keywords = ["bash", "shell", "profiling", "timing", "tracing"]
 categories = ["development-tools::profiling", "command-line-utilities"]
 
 [dependencies]
-bash-interop = "*"
-bash-strings = "*"
+bash-interop = "0.1"
+bash-strings = "0.1"
 hylic = "0.8"
 either = "1.15.0"
 serde = { version = "1.0", features = ["derive"] }
