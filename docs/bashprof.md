@@ -103,10 +103,10 @@ for its reading.
 
 ### The exit code
 
-The subject's own wherever the subject failed, so a profiled script is
-indistinguishable from an unprofiled one. Where the subject succeeded and
-bashprof could not write what was asked for, the failure is bashprof's and so
-is the status: 1, with the reason on stderr.
+Wherever the subject failed, its own exit code is passed through, so a
+profiled script is indistinguishable from an unprofiled one. Where the subject
+succeeded and bashprof could not write what was asked for, the failure belongs
+to bashprof and so does the status: 1, with the reason on stderr.
 
 The text renderings that `Profile` and `Recorded::render` produce stay in the
 library, for a caller assembling a report of its own.
@@ -147,7 +147,7 @@ BASHPROF_TIMETHIS() {
 }
 ```
 
-Three declarations in that frame carry the mechanism. `__BP_id` is declared
+Three declarations in that frame do the work. `__BP_id` is declared
 empty and filled by `__bp_begin`, so the END can name the same call.
 `__BP_inside` takes this call's name only after the BEGIN went out, the BEGIN
 having read the enclosing call's, which is what places this one in the tree.

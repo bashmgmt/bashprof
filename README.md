@@ -29,8 +29,15 @@ a call whose shell died before it ended is reported as unended rather than
 given a duration. The figure in parentheses is the call's own time with its
 children's subtracted.
 
-`BASHPROF_TIMETHIS` is a shell function that does nothing when no session is
-present, so a script carrying it runs the same way outside the profiler.
+A call site makes bashprof a dependency of the script that says it. Outside a
+session the word is a command that does not exist — status 127, and the
+wrapped command does not run — which is deliberate, since a call site asked
+for a measurement and measuring into nowhere would be worse. A script that
+must also run unprofiled defines the word itself, in one line:
+
+```bash
+declare -F BASHPROF_TIMETHIS >/dev/null || BASHPROF_TIMETHIS() { shift; "$@"; }
+```
 
 `--output` chooses how far the run is read: `human` for the tree above, `tree`
 for the same as JSON, `tree-with-err` to include calls that never ended, and
