@@ -31,7 +31,7 @@
 //! ```
 //!
 //! The modules are private, and [`recorded`] is the whole reading. Each module
-//! is one step of it, and what passes between them is nobody else's:
+//! is one step of it, and what passes between them stays inside:
 //!
 //! | | |
 //! |---|---|

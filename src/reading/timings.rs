@@ -117,7 +117,7 @@ impl fmt::Display for Profile {
 /// The forest held calls the shell died inside, so it is not a whole profile.
 ///
 /// The measurements that did complete come with it; the forest they were read
-/// from is the caller's already, and is borrowed.
+/// from already belongs to the caller, and is borrowed.
 #[derive(Debug)]
 pub struct Unfinished<'a> {
     pub resolved: Profile,
@@ -177,8 +177,9 @@ fn salvage(readings: &[Measured]) -> Vec<Span> {
 
 /// A call that ended *around* one that did not is not a measurement either:
 /// its own duration is known, but its exclusive time would count work it
-/// cannot account for. The rule is the whole subtree or none of it, which is
-/// what pairing the node's own record with [`measured`] says.
+/// cannot account for. The rule is the whole subtree or none of it, which the
+/// match below states by requiring the node's own record and [`measured`]
+/// together.
 fn measuring() -> VecFold<Recorded, Measured> {
     vec_fold(|heap: &VecHeap<Recorded, Measured>| {
         match (

@@ -25,8 +25,8 @@ use bash_interop::rig::{Driving, ExitStatus, Provision, heard};
 use bash_interop::scratch::{Scripts, bash};
 
 /// Run a script under the profiler. What comes back is the tree as recorded —
-/// every call that began, ended or not. Reading it as timings is the caller's,
-/// which is what each test below does next.
+/// every call that began, ended or not. The caller decides whether to read it
+/// as timings, which is what each test below does next.
 async fn profiled(script: &str) -> (Vec<Recorded>, ExitStatus) {
     let scripts = Scripts::of(&[("subject.bash", script)]);
     let ran = BashProf

@@ -6,9 +6,9 @@
 //! | [`nesting`] | those → a forest, the names spent | one index, then `Treeish` + `vec_fold` |
 //! | [`timings`] | that forest → measurements | one `vec_fold` |
 //!
-//! [`recorded`] is the whole of it and the only way in; what passes between
-//! the passes is nobody else's. `show` is hylic's tree formatter, which the
-//! last two passes both render through.
+//! [`recorded`] is the only way in, and what passes between the passes stays
+//! inside. `show` is hylic's tree formatter, which the last two passes both
+//! render through.
 //!
 //! Two of them can refuse, and each hands back what it did read: [`Unread`]
 //! where a message this instrument wrote would not read back, [`Unfinished`]

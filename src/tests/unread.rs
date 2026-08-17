@@ -62,8 +62,8 @@ async fn a_message_that_will_not_read_leaves_the_rest_standing() {
 }
 
 /// A call made inside one that never began is unreachable from any root, so
-/// the tree drops it. That the tree is shorter than what was read is the only
-/// record of it, and it is the forest's own shape.
+/// the tree drops it. Nothing counts that: the forest's shape is the record,
+/// being shorter than what was read.
 #[tokio::test]
 async fn a_call_whose_enclosing_one_never_began_is_dropped_and_counted() {
     let unread = read(

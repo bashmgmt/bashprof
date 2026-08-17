@@ -8,7 +8,8 @@
 //!
 //! What this pass owes the rest of the module is that the names hold up: a
 //! name is given once, ended once, and every name a call points at is one
-//! that was given. Each is a lookup, and each failure is the instrument's.
+//! that was given. Each is a lookup, and a failed one means the instrument
+//! faulted.
 
 use std::collections::HashMap;
 
@@ -77,7 +78,8 @@ struct Recording {
 }
 
 impl Recording {
-    /// One message. Anything not this instrument's is someone else's.
+    /// One message. A message this instrument did not write belongs to another
+    /// tool sharing the wire, and is passed over.
     fn hear(&mut self, said: Said<'_>) -> Result<(), Failure> {
         let Some(payload) = said.message.behind(TAG) else {
             return Ok(());
