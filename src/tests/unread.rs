@@ -39,7 +39,8 @@ async fn a_message_that_will_not_read_leaves_the_rest_standing() {
     let unread = read(
         r#"
         BASHPROF_TIMETHIS before true
-        BC_INSTR BASHPROF say TIMETHIS BEGIN id 1.99 inside "" label mangled
+        declare -- BC_SAY__ARG_LABEL=BASHPROF
+        BC_SAY TIMETHIS BEGIN id 1.99 inside "" label mangled
         BASHPROF_TIMETHIS after true
         "#,
     )
@@ -70,7 +71,8 @@ async fn a_call_whose_enclosing_one_never_began_is_dropped_and_counted() {
         GHOST() {
             local -a __w=()
             __bc_stack __w 2
-            BC_INSTR BASHPROF say TIMETHIS BEGIN id 1.99 inside nobody label ghost argv "()" "${__w[@]}"
+            declare -- BC_SAY__ARG_LABEL=BASHPROF
+            BC_SAY TIMETHIS BEGIN id 1.99 inside nobody label ghost argv "()" "${__w[@]}"
         }
 
         BASHPROF_TIMETHIS kept true

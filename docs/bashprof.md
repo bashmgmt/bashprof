@@ -129,19 +129,20 @@ everything the measured call reads is declared. The word, whole, from
 
 ```bash
 BASHPROF_TIMETHIS() {
-    local __BP_label="${1-}"
+    declare __BP_label="${1-}"
     shift || return 125
 
-    local __BP_id=
+    declare __BP_id=
     __bp_begin "$@" || return $?
 
-    local __BP_inside="$__BP_id"
+    declare __BP_inside="$__BP_id"
     declare -- __BASHPROF_STACK_SHIFT=
 
     "$@"
-    local __BP_rc=$?
+    declare __BP_rc=$?
 
-    BC_INSTR BASHPROF say TIMETHIS END id "$__BP_id" status "$__BP_rc" || return $?
+    declare -- BC_SAY__ARG_LABEL=BASHPROF
+    BC_SAY TIMETHIS END id "$__BP_id" status "$__BP_rc" || return $?
 
     return "$__BP_rc"
 }
@@ -160,15 +161,16 @@ same file:
 
 ```bash
 __bp_begin() {
-    local IFS=' '
+    declare IFS=' '
 
-    local -a __BP_stack=()
+    declare -a __BP_stack=()
     __bc_stack __BP_stack $(( 3 + ${__BASHPROF_STACK_SHIFT:-0} ))
 
     __BP_made=$(( ${__BP_made:-0} + 1 ))
     __BP_id="$BASHPID.$__BP_made"
 
-    BC_INSTR BASHPROF say TIMETHIS BEGIN id "$__BP_id" inside "${__BP_inside-}" \
+    declare -- BC_SAY__ARG_LABEL=BASHPROF
+    BC_SAY TIMETHIS BEGIN id "$__BP_id" inside "${__BP_inside-}" \
         label "$__BP_label" argv "(${*@Q})" "${__BP_stack[@]}"
 }
 ```
@@ -189,7 +191,7 @@ with that frame:
 
 ```bash
 measure_step() {
-    local __BASHPROF_STACK_SHIFT=1
+    declare __BASHPROF_STACK_SHIFT=1
     BASHPROF_TIMETHIS "$@"
 }
 ```
@@ -201,7 +203,7 @@ pays one parameter expansion.
 The word clears it, in the same breath as handing the name down:
 
 ```bash
-local __BP_inside="$__BP_id"
+declare __BP_inside="$__BP_id"
 declare -- __BASHPROF_STACK_SHIFT=
 ```
 

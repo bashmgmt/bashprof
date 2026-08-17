@@ -12,7 +12,7 @@
 # this word in one of its own:
 #
 #     measure_step() {
-#         local __BASHPROF_STACK_SHIFT=1
+#         declare __BASHPROF_STACK_SHIFT=1
 #         BASHPROF_TIMETHIS "$@"
 #     }
 #
@@ -32,19 +32,20 @@
 # `$?` is read as the first command after the call, which is the only place it
 # survives, and returned after the END has clobbered it.
 BASHPROF_TIMETHIS() {
-    local __BP_label="${1-}"
+    declare __BP_label="${1-}"
     shift || return 125
 
-    local __BP_id=
+    declare __BP_id=
     __bp_begin "$@" || return $?
 
-    local __BP_inside="$__BP_id"
+    declare __BP_inside="$__BP_id"
     declare -- __BASHPROF_STACK_SHIFT=
 
     "$@"
-    local __BP_rc=$?
+    declare __BP_rc=$?
 
-    BC_INSTR BASHPROF say TIMETHIS END id "$__BP_id" status "$__BP_rc" || return $?
+    declare -- BC_SAY__ARG_LABEL=BASHPROF
+    BC_SAY TIMETHIS END id "$__BP_id" status "$__BP_rc" || return $?
 
     return "$__BP_rc"
 }
@@ -58,7 +59,7 @@ BASHPROF_TIMETHIS() {
 # asked for adds to it. Read through `:-0` because an unset name inside `(( ))`
 # is an error under `set -u`, and an empty one is zero.
 #
-# `__BP_made` is not local — one count per shell, which a fork inherits and
+# `__BP_made` is undeclared here — one count per shell, which a fork inherits and
 # then advances its own copy of, under its own pid. $BASHPID differs in every
 # process, so the two together name a call across the run's process tree. It
 # is unset until the first measured call, and read through `:-0` for the same
@@ -67,14 +68,15 @@ BASHPROF_TIMETHIS() {
 # `__BP_inside` is not the word's yet: it resolves to the enclosing call's,
 # which is what makes this BEGIN name the caller's call rather than its own.
 __bp_begin() {
-    local IFS=' '
+    declare IFS=' '
 
-    local -a __BP_stack=()
+    declare -a __BP_stack=()
     __bc_stack __BP_stack $(( 3 + ${__BASHPROF_STACK_SHIFT:-0} ))
 
     __BP_made=$(( ${__BP_made:-0} + 1 ))
     __BP_id="$BASHPID.$__BP_made"
 
-    BC_INSTR BASHPROF say TIMETHIS BEGIN id "$__BP_id" inside "${__BP_inside-}" \
+    declare -- BC_SAY__ARG_LABEL=BASHPROF
+    BC_SAY TIMETHIS BEGIN id "$__BP_id" inside "${__BP_inside-}" \
         label "$__BP_label" argv "(${*@Q})" "${__BP_stack[@]}"
 }

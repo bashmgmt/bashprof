@@ -173,7 +173,8 @@ fn mangled() -> Scripts {
         "build.bash",
         r#"
         BASHPROF_TIMETHIS before true
-        BC_INSTR BASHPROF say TIMETHIS BEGIN id 1.99 inside "" label mangled
+        declare -- BC_SAY__ARG_LABEL=BASHPROF
+        BC_SAY TIMETHIS BEGIN id 1.99 inside "" label mangled
         BASHPROF_TIMETHIS after true
         "#,
     )])
