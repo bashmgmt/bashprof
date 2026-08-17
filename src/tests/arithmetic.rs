@@ -4,8 +4,8 @@
 use std::sync::Arc;
 
 use bash_interop::rig::{Micros, Stamp};
-use bash_interop::stack::{Frame, Site, Source, Stack};
 use bash_interop::scratch::accounts;
+use bash_interop::stack::{Frame, Site, Source, Stack};
 
 use crate::reading::{Profile, Recorded, Span};
 use crate::record::{Call, Complete, Id, Record};
@@ -23,20 +23,33 @@ fn call(label: &str, began: u64) -> Call {
         }])
         .unwrap(),
         shell: accounts::reading("/x.bash"),
-        stamp: Stamp { sent_at: Micros(began), heard_at: Micros(began) },
+        stamp: Stamp {
+            sent_at: Micros(began),
+            heard_at: Micros(began),
+        },
     }
 }
 
 fn complete(label: &str, began: u64, ended: u64) -> Complete {
-    Complete { call: call(label, began), ended_at: Micros(ended), status: 0 }
+    Complete {
+        call: call(label, began),
+        ended_at: Micros(ended),
+        status: 0,
+    }
 }
 
 fn node(record: Record, children: Vec<Recorded>) -> Recorded {
-    Recorded { record, children: Arc::from(children) }
+    Recorded {
+        record,
+        children: Arc::from(children),
+    }
 }
 
 fn span(label: &str, began: u64, ended: u64, children: Vec<Span>) -> Span {
-    Span { complete: complete(label, began, ended), children }
+    Span {
+        complete: complete(label, began, ended),
+        children,
+    }
 }
 
 /// Two children overlapping each other and a third outliving its parent: the
@@ -57,7 +70,11 @@ fn a_spans_own_time_is_what_no_child_was_running_for() {
     );
 
     assert_eq!(a.complete.took(), 100);
-    assert_eq!(a.exclusive(), 15, "0..10 and 90..95, and nothing else");
+    assert_eq!(
+        a.exclusive(),
+        15,
+        "0..10 and 90..95, and nothing else"
+    );
 }
 
 /// Nesting cannot produce this — a shell that dies inside a call leaves every
@@ -72,8 +89,14 @@ fn a_call_that_ended_around_one_that_did_not_is_no_measurement_either() {
     let forest = [node(
         Record::Ended(complete("outer", 0, 100)),
         vec![
-            node(Record::Ended(complete("done", 10, 20)), Vec::new()),
-            node(Record::Unended(call("open", 30)), Vec::new()),
+            node(
+                Record::Ended(complete("done", 10, 20)),
+                Vec::new(),
+            ),
+            node(
+                Record::Unended(call("open", 30)),
+                Vec::new(),
+            ),
         ],
     )];
 
@@ -81,7 +104,12 @@ fn a_call_that_ended_around_one_that_did_not_is_no_measurement_either() {
 
     assert_eq!(unfinished.unended().len(), 1);
     assert_eq!(
-        unfinished.resolved.roots.iter().map(|s| s.complete.call.label.as_str()).collect::<Vec<_>>(),
+        unfinished
+            .resolved
+            .roots
+            .iter()
+            .map(|s| s.complete.call.label.as_str())
+            .collect::<Vec<_>>(),
         ["done"],
         "`outer` knows its own duration but cannot account for it, so it is not a span"
     );

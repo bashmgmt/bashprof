@@ -17,12 +17,24 @@ const BASHPROF: &str = env!("CARGO_BIN_EXE_bashprof");
 #[test]
 fn help_says_how_a_script_joins() {
     for verb in ["run", "serve"] {
-        let help = Command::new(BASHPROF).args([verb, "--help"]).output().expect("--help");
+        let help = Command::new(BASHPROF)
+            .args([verb, "--help"])
+            .output()
+            .expect("--help");
         let text = String::from_utf8(help.stdout).unwrap();
 
-        assert!(text.contains(r#"BASHPROF_INIT "$BASHPROF_SESSION""#), "{verb} --help:\n{text}");
-        assert!(text.contains("coproc SERVER"), "{verb} --help:\n{text}");
-        assert!(text.contains(r#"source "$workspace/prelude.bash""#), "{verb} --help:\n{text}");
+        assert!(
+            text.contains(r#"BASHPROF_INIT "$BASHPROF_SESSION""#),
+            "{verb} --help:\n{text}"
+        );
+        assert!(
+            text.contains("coproc SERVER"),
+            "{verb} --help:\n{text}"
+        );
+        assert!(
+            text.contains(r#"source "$workspace/prelude.bash""#),
+            "{verb} --help:\n{text}"
+        );
     }
 }
 
@@ -76,9 +88,20 @@ fn dying() -> Scripts {
 fn a_run_that_died_mid_call_refuses_to_report_measurements() {
     let ran = bashprof(&dying(), &[]);
 
-    assert_eq!(ran.status, Some(1), "the subject's own code, not the wrapper's");
-    assert_eq!(ran.into, "", "no tree claiming time it lacks");
-    assert!(ran.stderr.contains(r#"calls that never ended: ["doomed"]"#), "{}", ran.stderr);
+    assert_eq!(
+        ran.status,
+        Some(1),
+        "the subject's own code, not the wrapper's"
+    );
+    assert_eq!(
+        ran.into, "",
+        "no tree claiming time it lacks"
+    );
+    assert!(
+        ran.stderr.contains(r#"calls that never ended: ["doomed"]"#),
+        "{}",
+        ran.stderr
+    );
 }
 
 /// Both streams are the subject's alone. Nothing of bashprof's reaches them,
@@ -88,7 +111,10 @@ fn the_subject_owns_both_streams() {
     let ran = bashprof(&dying(), &["--output=tree-with-err"]);
 
     assert_eq!(ran.stdout, "the subject's own stdout\n");
-    assert_eq!(ran.stderr, "", "and nothing was wrong to report");
+    assert_eq!(
+        ran.stderr, "",
+        "and nothing was wrong to report"
+    );
 }
 
 /// The same run as recorded. Whether a call ended is the node's tag, and an
@@ -96,7 +122,11 @@ fn the_subject_owns_both_streams() {
 #[test]
 fn the_recorded_reading_keeps_the_call_that_never_ended() {
     let ran = bashprof(&dying(), &["--output=tree-with-err"]);
-    assert_eq!(ran.status, Some(1), "still the subject's own code");
+    assert_eq!(
+        ran.status,
+        Some(1),
+        "still the subject's own code"
+    );
 
     let tree: serde_json::Value = serde_json::from_str(&ran.into).expect("a JSON tree");
     let states: Vec<(String, String)> = tree
@@ -107,17 +137,32 @@ fn the_recorded_reading_keeps_the_call_that_never_ended() {
             let (state, body) = node["record"].as_object().unwrap().iter().next().unwrap();
             let call = body.get("call").unwrap_or(body);
 
-            (call["label"].as_str().unwrap().to_string(), state.clone())
+            (
+                call["label"].as_str().unwrap().to_string(),
+                state.clone(),
+            )
         })
         .collect();
 
     assert_eq!(
         states,
-        [("ok".to_string(), "ended".to_string()), ("doomed".to_string(), "unended".to_string())],
+        [
+            ("ok".to_string(), "ended".to_string()),
+            (
+                "doomed".to_string(),
+                "unended".to_string()
+            )
+        ],
         "{tree:#}"
     );
-    assert_eq!(tree[0]["record"]["ended"]["status"], 0, "what the measured command returned");
-    assert!(tree[1]["record"]["unended"].get("ended_at").is_none(), "no END, so no end");
+    assert_eq!(
+        tree[0]["record"]["ended"]["status"], 0,
+        "what the measured command returned"
+    );
+    assert!(
+        tree[1]["record"]["unended"].get("ended_at").is_none(),
+        "no END, so no end"
+    );
 }
 
 /// A run holding a message the instrument wrote and cannot read back, beside
@@ -142,23 +187,50 @@ fn a_message_that_will_not_read_refuses_a_profile_and_not_a_record() {
     let complaint = r#"a BEGIN with no "argv""#;
 
     let refused = bashprof(&mangled(), &[]);
-    assert_eq!(refused.status, Some(1), "bashprof's own code: the subject was fine");
-    assert_eq!(refused.into, "", "no tree claiming time it cannot account for");
-    assert!(refused.stderr.contains(complaint), "{}", refused.stderr);
+    assert_eq!(
+        refused.status,
+        Some(1),
+        "bashprof's own code: the subject was fine"
+    );
+    assert_eq!(
+        refused.into, "",
+        "no tree claiming time it cannot account for"
+    );
+    assert!(
+        refused.stderr.contains(complaint),
+        "{}",
+        refused.stderr
+    );
 
     let kept = bashprof(&mangled(), &["--output=tree-with-err"]);
-    assert_eq!(kept.status, Some(0), "the subject's own code");
-    assert!(kept.stderr.contains(complaint), "{}", kept.stderr);
+    assert_eq!(
+        kept.status,
+        Some(0),
+        "the subject's own code"
+    );
+    assert!(
+        kept.stderr.contains(complaint),
+        "{}",
+        kept.stderr
+    );
 
     let tree: serde_json::Value = serde_json::from_str(&kept.into).expect("a JSON tree");
     let labels: Vec<&str> = tree
         .as_array()
         .expect("an array of roots")
         .iter()
-        .map(|node| node["record"]["ended"]["call"]["label"].as_str().expect("a label"))
+        .map(|node| {
+            node["record"]["ended"]["call"]["label"]
+                .as_str()
+                .expect("a label")
+        })
         .collect();
 
-    assert_eq!(labels, ["before", "after"], "the calls around it are no less true: {tree:#}");
+    assert_eq!(
+        labels,
+        ["before", "after"],
+        "the calls around it are no less true: {tree:#}"
+    );
 }
 
 /// Before any of it is read as calls: one JSON object per line, each the
@@ -176,21 +248,37 @@ fn the_raw_reading_is_one_message_per_line() {
 
     // A shell's account of itself is not among these: it is what makes the
     // shell, and what every line then carries whole.
-    let kinds: Vec<&str> =
-        heard.iter().map(|said| said["message"]["verb"].as_str().unwrap()).collect();
-    assert_eq!(kinds, ["SAY", "SAY", "SAY"], "{}", ran.into);
+    let kinds: Vec<&str> = heard
+        .iter()
+        .map(|said| said["message"]["verb"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        kinds,
+        ["SAY", "SAY", "SAY"],
+        "{}",
+        ran.into
+    );
     assert!(
         heard.iter().all(|said| said["shell"]["pid"].is_u64()),
         "and says which shell: {}",
         ran.into
     );
 
-    let said: Vec<&str> =
-        heard.iter().map(|said| said["message"]["words"][1].as_str().unwrap()).collect();
+    let said: Vec<&str> = heard
+        .iter()
+        .map(|said| said["message"]["words"][1].as_str().unwrap())
+        .collect();
 
-    assert_eq!(said, ["BEGIN", "END", "BEGIN"], "{}", ran.into);
+    assert_eq!(
+        said,
+        ["BEGIN", "END", "BEGIN"],
+        "{}",
+        ran.into
+    );
     assert!(
-        heard.iter().all(|said| said["message"]["words"][0] == "TIMETHIS"),
+        heard
+            .iter()
+            .all(|said| said["message"]["words"][0] == "TIMETHIS"),
         "{}",
         ran.into
     );
@@ -200,7 +288,9 @@ fn the_raw_reading_is_one_message_per_line() {
 
 /// A file under `__fixtures/`, by path from the crate root.
 fn fixture(relative: &str) -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("__fixtures").join(relative)
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("__fixtures")
+        .join(relative)
 }
 
 /// A served session end to end, over the shipped binary: a script starts
@@ -218,8 +308,17 @@ fn a_script_starts_bashprof_for_itself_and_keeps_the_reading() {
         .output()
         .expect("bash");
 
-    assert_eq!(String::from_utf8(joined.stdout).unwrap(), "built\n", "and the same output");
-    assert_eq!(joined.status.code(), Some(0), "{}", String::from_utf8_lossy(&joined.stderr));
+    assert_eq!(
+        String::from_utf8(joined.stdout).unwrap(),
+        "built\n",
+        "and the same output"
+    );
+    assert_eq!(
+        joined.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&joined.stderr)
+    );
 
     // The script waited for the server it started, so the reading is on disk by
     // the time it exits. Two spaces of indent per level, label first.
@@ -230,7 +329,10 @@ fn a_script_starts_bashprof_for_itself_and_keeps_the_reading() {
         .map(|line| {
             let depth = (line.len() - line.trim_start().len()) / 2;
 
-            (depth, line.trim_start().split(' ').next().expect("a label"))
+            (
+                depth,
+                line.trim_start().split(' ').next().expect("a label"),
+            )
         })
         .collect();
 
@@ -256,8 +358,17 @@ fn the_books_scripts_run_as_printed() {
         .arg(fixture("book/provisioned.bash"))
         .output()
         .expect("bashprof");
-    assert_eq!(ran.status.code(), Some(0), "{}", String::from_utf8_lossy(&ran.stderr));
-    assert!(std::fs::read_to_string(&into).expect("the reading").contains("build"));
+    assert_eq!(
+        ran.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&ran.stderr)
+    );
+    assert!(
+        std::fs::read_to_string(&into)
+            .expect("the reading")
+            .contains("build")
+    );
 
     let into = scripts.at("by-hand.times");
     let ran = Command::new(BASHPROF)
@@ -267,13 +378,25 @@ fn the_books_scripts_run_as_printed() {
         .arg(fixture("book/by-hand.bash"))
         .output()
         .expect("bashprof");
-    assert_eq!(ran.status.code(), Some(0), "{}", String::from_utf8_lossy(&ran.stderr));
-    assert!(std::fs::read_to_string(&into).expect("the reading").contains("build"));
+    assert_eq!(
+        ran.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&ran.stderr)
+    );
+    assert!(
+        std::fs::read_to_string(&into)
+            .expect("the reading")
+            .contains("build")
+    );
 
-    let bin_dir = std::path::Path::new(BASHPROF).parent().expect("the target dir");
+    let bin_dir = std::path::Path::new(BASHPROF)
+        .parent()
+        .expect("the target dir");
     let path = std::env::join_paths(
-        std::iter::once(bin_dir.to_path_buf())
-            .chain(std::env::split_paths(&std::env::var_os("PATH").unwrap_or_default())),
+        std::iter::once(bin_dir.to_path_buf()).chain(std::env::split_paths(
+            &std::env::var_os("PATH").unwrap_or_default(),
+        )),
     )
     .expect("PATH");
     let marker = scripts.at("cwd");
@@ -284,7 +407,12 @@ fn the_books_scripts_run_as_printed() {
         .current_dir(dir)
         .output()
         .expect("bash");
-    assert_eq!(ran.status.code(), Some(0), "{}", String::from_utf8_lossy(&ran.stderr));
+    assert_eq!(
+        ran.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&ran.stderr)
+    );
     let reading = std::fs::read_to_string(dir.join("build.times")).expect("the reading");
     assert!(reading.contains("build"));
 }

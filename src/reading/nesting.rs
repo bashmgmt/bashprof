@@ -12,12 +12,12 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use hylic::prelude::{treeish, vec_fold, VecHeap, FUSED};
+use hylic::prelude::{FUSED, VecHeap, treeish, vec_fold};
 use serde::{Deserialize, Serialize};
 
-use crate::record::{Call, Id, Record};
 use super::records::Placed;
 use super::show;
+use crate::record::{Call, Id, Record};
 
 /// A call, and everything called inside it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,7 +38,9 @@ impl Recorded {
             Record::Ended(_) => None,
         };
 
-        own.into_iter().chain(self.children.iter().flat_map(Recorded::unended_here)).collect()
+        own.into_iter()
+            .chain(self.children.iter().flat_map(Recorded::unended_here))
+            .collect()
     }
 
     /// Every source path a frame in this forest names and does not have,
@@ -51,8 +53,12 @@ impl Recorded {
         let mut seen: Vec<&Path> = Vec::new();
 
         for node in forest {
-            let own =
-                node.record.call().stack.frames().filter_map(|frame| frame.source.missing());
+            let own = node
+                .record
+                .call()
+                .stack
+                .frames()
+                .filter_map(|frame| frame.source.missing());
 
             for path in own.chain(Recorded::missing(&node.children)) {
                 if !seen.contains(&path) {
@@ -65,15 +71,24 @@ impl Recorded {
 
     /// The forest as it stands, ended and unended alike.
     pub fn render(forest: &[Recorded]) -> String {
-        show::tree(forest, |node: &Recorded| node.children.to_vec(), |node: &Recorded| {
-            let call = node.record.call();
-            let took = match &node.record {
-                Record::Ended(complete) => format!("{} µs", complete.took()),
-                Record::Unended(_) => "NEVER ENDED".to_string(),
-            };
+        show::tree(
+            forest,
+            |node: &Recorded| node.children.to_vec(),
+            |node: &Recorded| {
+                let call = node.record.call();
+                let took = match &node.record {
+                    Record::Ended(complete) => format!("{} µs", complete.took()),
+                    Record::Unended(_) => "NEVER ENDED".to_string(),
+                };
 
-            format!("{} {took} at {} in pid {}", call.label, call.stack.top(), call.shell.pid)
-        })
+                format!(
+                    "{} {took} at {} in pid {}",
+                    call.label,
+                    call.stack.top(),
+                    call.shell.pid
+                )
+            },
+        )
     }
 }
 
@@ -92,7 +107,14 @@ impl Nesting {
         let mut roots = Vec::new();
         let mut records = Vec::with_capacity(read.len());
 
-        for (index, Placed { record, inside: outer }) in read.into_iter().enumerate() {
+        for (
+            index,
+            Placed {
+                record,
+                inside: outer,
+            },
+        ) in read.into_iter().enumerate()
+        {
             match outer {
                 Some(outer) => inside.entry(outer).or_default().push(index),
                 None => roots.push(index),
@@ -101,7 +123,11 @@ impl Nesting {
             records.push(record);
         }
 
-        Self { records, inside, roots }
+        Self {
+            records,
+            inside,
+            roots,
+        }
     }
 
     fn children(&self, of: &Id) -> &[usize] {
@@ -125,7 +151,10 @@ impl Node {
         self.nesting
             .children(&self.record().call().id)
             .iter()
-            .map(|&index| Node { index, nesting: self.nesting.clone() })
+            .map(|&index| Node {
+                index,
+                nesting: self.nesting.clone(),
+            })
             .collect()
     }
 }
@@ -135,15 +164,20 @@ impl Node {
 pub(super) fn nest(read: Vec<Placed>) -> Vec<Recorded> {
     let nesting = Arc::new(Nesting::of(read));
     let shape = treeish(Node::children);
-    let build = vec_fold(|heap: &VecHeap<Node, Recorded>| Recorded {
-        record: heap.node.record().clone(),
-        children: Arc::from(heap.childresults.as_slice()),
-    });
+    let build = vec_fold(
+        |heap: &VecHeap<Node, Recorded>| Recorded {
+            record: heap.node.record().clone(),
+            children: Arc::from(heap.childresults.as_slice()),
+        },
+    );
 
     nesting
         .roots
         .iter()
-        .map(|&index| Node { index, nesting: nesting.clone() })
+        .map(|&index| Node {
+            index,
+            nesting: nesting.clone(),
+        })
         .map(|root| FUSED.run(&build, &shape, &root))
         .collect()
 }

@@ -1,7 +1,7 @@
 //! What the injected bash may not do to a shell.
 
-use bash_interop::stack;
 use crate::WORDS;
+use bash_interop::stack;
 
 #[test]
 fn no_shipped_bash_exports_a_name() {
@@ -9,8 +9,14 @@ fn no_shipped_bash_exports_a_name() {
     let shipped = [("stack.bash", walk.as_str()), ("words.bash", WORDS)];
 
     for (whose, bash) in shipped {
-        for line in bash.lines().filter(|line| !line.trim_start().starts_with('#')) {
-            assert!(!line.contains("export "), "{whose}: {line}");
+        for line in bash
+            .lines()
+            .filter(|line| !line.trim_start().starts_with('#'))
+        {
+            assert!(
+                !line.contains("export "),
+                "{whose}: {line}"
+            );
         }
     }
 }

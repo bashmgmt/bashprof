@@ -23,8 +23,8 @@ use std::fmt;
 
 use bash_interop::rig::{Failure, Said};
 
-pub use timings::{Profile, Span, Unfinished};
 pub use nesting::Recorded;
+pub use timings::{Profile, Span, Unfinished};
 
 /// What a run recorded, as the tree its calls made: every call that began,
 /// whether or not it ended.
@@ -49,7 +49,10 @@ pub fn recorded(heard: &[Said<'_>]) -> Result<Vec<Recorded>, Unread> {
 
     match unreadable.is_empty() {
         true => Ok(resolved),
-        false => Err(Unread { resolved, unreadable }),
+        false => Err(Unread {
+            resolved,
+            unreadable,
+        }),
     }
 }
 
@@ -77,7 +80,11 @@ impl fmt::Display for Unread {
             writeln!(f, "{why}")?;
         }
 
-        write!(f, "{} calls read", nested(&self.resolved))
+        write!(
+            f,
+            "{} calls read",
+            nested(&self.resolved)
+        )
     }
 }
 

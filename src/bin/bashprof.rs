@@ -13,10 +13,8 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
-use bash_interop::rig::{
-    heard, Attended, Doing, Driving, Failure, Layout, Message, Provision, Said, Serving,
-};
-use bashprof::{recorded, BashProf, Profile, Recorded, Unfinished, Unread};
+use bash_interop::rig::{Attended, Doing, Driving, Failure, Layout, Message, Provision, Said, Serving, heard};
+use bashprof::{BashProf, Profile, Recorded, Unfinished, Unread, recorded};
 
 /// Every way a script joins this tool's sessions, in this tool's words —
 /// appended to the session-opening verbs' `--help`.
@@ -102,14 +100,22 @@ enum Reach {
 /// This tool's convention: the workspace directory as `BASHPROF_SESSION`,
 /// spelled here, consulted by nothing in the core.
 fn session(at: &Layout) -> (OsString, OsString) {
-    (OsString::from("BASHPROF_SESSION"), OsString::from(at.text()))
+    (
+        OsString::from("BASHPROF_SESSION"),
+        OsString::from(at.text()),
+    )
 }
 
 impl Reach {
     fn environment(self, at: &Layout) -> Result<Vec<(OsString, OsString)>, Failure> {
         Ok(match self {
             Self::BashEnv => {
-                vec![session(at), at.bash_env(Provision::Joining(&bashprof::joining(at)))?]
+                vec![
+                    session(at),
+                    at.bash_env(Provision::Joining(&bashprof::joining(
+                        at,
+                    )))?,
+                ]
             }
             Self::ByHand => vec![session(at), at.bash_env(Provision::Definitions)?],
         })
@@ -193,7 +199,11 @@ async fn main() {
 
 async fn perform(what: &What) -> i32 {
     match what {
-        What::Run { reading, reach, argv } => run(reading, *reach, argv).await,
+        What::Run {
+            reading,
+            reach,
+            argv,
+        } => run(reading, *reach, argv).await,
         What::Serve { reading, at } => match serve(reading, at).await {
             Ok(()) => 0,
             Err(why) => {
@@ -253,7 +263,10 @@ fn read(heard: &[Said<'_>]) -> Result<Vec<Recorded>, Unread> {
     let forest = recorded(heard);
 
     for path in Recorded::missing(forest.as_ref().unwrap_or_else(|unread| &unread.resolved)) {
-        eprintln!("bashprof: no source at {}", path.display());
+        eprintln!(
+            "bashprof: no source at {}",
+            path.display()
+        );
     }
 
     forest
@@ -275,7 +288,10 @@ fn salvaged(heard: &[Said<'_>]) -> Vec<Recorded> {
 fn measured(heard: &[Said<'_>]) -> Result<Profile, Failure> {
     let forest = read(heard).map_err(|unread| Failure::new("reading the run", unread.to_string()))?;
     let reading = |unfinished: Unfinished<'_>| {
-        Failure::new("reading the run as measurements", unfinished.to_string())
+        Failure::new(
+            "reading the run as measurements",
+            unfinished.to_string(),
+        )
     };
 
     Profile::of(&forest).map_err(reading)

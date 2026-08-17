@@ -9,9 +9,25 @@ use super::*;
 /// Everything the run recorded, and why the rest did not.
 async fn read(script: &str) -> Result<Vec<Recorded>, Unread> {
     let scripts = Scripts::of(&[("subject.bash", script)]);
-    let ran = BashProf.run(&bash(scripts.at("subject.bash")), |at| Ok(vec![at.bash_env(Provision::Joining(&crate::joining(at)))?])).await.unwrap().whole().unwrap();
+    let ran = BashProf
+        .run(
+            &bash(scripts.at("subject.bash")),
+            |at| {
+                Ok(vec![at.bash_env(
+                    Provision::Joining(&crate::joining(at)),
+                )?])
+            },
+        )
+        .await
+        .unwrap()
+        .whole()
+        .unwrap();
 
-    assert_eq!(ran.subject, ExitStatus::Code(0), "the subject itself is fine");
+    assert_eq!(
+        ran.subject,
+        ExitStatus::Code(0),
+        "the subject itself is fine"
+    );
 
     recorded(&heard(&ran.shells))
 }
@@ -30,12 +46,18 @@ async fn a_message_that_will_not_read_leaves_the_rest_standing() {
     .await
     .expect_err("the mangled BEGIN");
 
-    let labels: Vec<&str> =
-        unread.resolved.iter().map(|node| node.record.call().label.as_str()).collect();
+    let labels: Vec<&str> = unread
+        .resolved
+        .iter()
+        .map(|node| node.record.call().label.as_str())
+        .collect();
 
     assert_eq!(labels, ["before", "after"], "{unread}");
     assert_eq!(unread.unreadable.len(), 1);
-    assert!(unread.unreadable[0].to_string().contains("argv"), "{unread}");
+    assert!(
+        unread.unreadable[0].to_string().contains("argv"),
+        "{unread}"
+    );
 }
 
 /// A call made inside one that never began is unreachable from any root, so
@@ -58,12 +80,18 @@ async fn a_call_whose_enclosing_one_never_began_is_dropped_and_counted() {
     .await
     .expect_err("the orphaned call");
 
-    let labels: Vec<&str> =
-        unread.resolved.iter().map(|node| node.record.call().label.as_str()).collect();
+    let labels: Vec<&str> = unread
+        .resolved
+        .iter()
+        .map(|node| node.record.call().label.as_str())
+        .collect();
 
     assert_eq!(labels, ["kept"], "{unread}");
     assert_eq!(unread.unreadable.len(), 1);
-    assert!(unread.unreadable[0].to_string().contains("1 calls"), "{unread}");
+    assert!(
+        unread.unreadable[0].to_string().contains("1 calls"),
+        "{unread}"
+    );
 }
 
 /// A run with nothing wrong in it says so by reading whole, which is what

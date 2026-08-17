@@ -65,10 +65,13 @@ BASHPROF_INIT() {
 /// The standard initiation: `BASHPROF_INIT '<dir>'`. Data — written into a
 /// provisioned `bash_env.bash`, or said by a client's own line.
 pub fn joining(at: &Layout) -> String {
-    format!("BASHPROF_INIT {}\n", bash_strings::emit_scalar(at.text()))
+    format!(
+        "BASHPROF_INIT {}\n",
+        bash_strings::emit_scalar(at.text())
+    )
 }
 
-pub use reading::{recorded, Profile, Recorded, Span, Unfinished, Unread};
+pub use reading::{Profile, Recorded, Span, Unfinished, Unread, recorded};
 pub use record::{Call, Complete, Id, Record};
 
 #[cfg(test)]

@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use bash_interop::rig::{field, Doing, Failure, Micros, Said};
+use bash_interop::rig::{Doing, Failure, Micros, Said, field};
 use bash_interop::stack::Columns;
 use bash_strings::parse_array;
 
@@ -79,7 +79,9 @@ struct Recording {
 impl Recording {
     /// One message. Anything not this instrument's is someone else's.
     fn hear(&mut self, said: Said<'_>) -> Result<(), Failure> {
-        let Some(payload) = said.message.behind(TAG) else { return Ok(()) };
+        let Some(payload) = said.message.behind(TAG) else {
+            return Ok(());
+        };
         let Some((kind, rest)) = payload.split_first() else {
             return Err(broken("an empty TIMETHIS message"));
         };
@@ -87,7 +89,9 @@ impl Recording {
         match kind.as_str() {
             "BEGIN" => self.begin(said, rest),
             "END" => self.end(rest, said.message.stamp.sent_at),
-            other => Err(broken(format!("unknown kind {other:?}"))),
+            other => Err(broken(format!(
+                "unknown kind {other:?}"
+            ))),
         }
     }
 
@@ -100,23 +104,39 @@ impl Recording {
         let (call, inside) = began(said, rest)?;
 
         if self.at.contains_key(&call.id) {
-            return Err(broken(format!("a second call named {}", call.id)));
+            return Err(broken(format!(
+                "a second call named {}",
+                call.id
+            )));
         }
 
         self.at.insert(call.id.clone(), self.opened.len());
-        self.opened.push(Open { call, inside, closed: None });
+        self.opened.push(Open {
+            call,
+            inside,
+            closed: None,
+        });
         Ok(())
     }
 
     fn end(&mut self, rest: &[String], ended_at: Micros) -> Result<(), Failure> {
         let id = named(rest)?;
-        let status = field(rest, "status")
-            .ok_or_else(|| broken(format!("an END for {id} with no status")))?;
-        let status = status
-            .parse()
-            .map_err(|_| broken(format!("an END for {id} with status {status:?}")))?;
+        let status = field(rest, "status").ok_or_else(|| {
+            broken(format!(
+                "an END for {id} with no status"
+            ))
+        })?;
+        let status = status.parse().map_err(|_| {
+            broken(format!(
+                "an END for {id} with status {status:?}"
+            ))
+        })?;
 
-        let unknown = || broken(format!("an END for {id}, which never began"));
+        let unknown = || {
+            broken(format!(
+                "an END for {id}, which never began"
+            ))
+        };
         let open = &mut self.opened[*self.at.get(&id).ok_or_else(unknown)?];
 
         if open.closed.is_some() {
@@ -133,15 +153,23 @@ impl Recording {
 
         let mut records: Vec<Placed> = opened
             .into_iter()
-            .map(|Open { call, inside, closed }| Placed {
-                record: match closed {
-                    Some(Closed { ended_at, status }) => {
-                        Record::Ended(Complete { call, ended_at, status })
-                    }
-                    None => Record::Unended(call),
+            .map(
+                |Open {
+                     call,
+                     inside,
+                     closed,
+                 }| Placed {
+                    record: match closed {
+                        Some(Closed { ended_at, status }) => Record::Ended(Complete {
+                            call,
+                            ended_at,
+                            status,
+                        }),
+                        None => Record::Unended(call),
+                    },
+                    inside,
                 },
-                inside,
-            })
+            )
             .collect();
 
         records.sort_by_key(|read| read.record.call().stamp.sent_at);
@@ -151,14 +179,18 @@ impl Recording {
 
 /// The `id` an END names.
 fn named(rest: &[String]) -> Result<Id, Failure> {
-    field(rest, "id").map(|id| Id(id.to_string())).ok_or_else(|| broken("a message with no id"))
+    field(rest, "id")
+        .map(|id| Id(id.to_string()))
+        .ok_or_else(|| broken("a message with no id"))
 }
 
 /// The call one BEGIN reports, and the name it says encloses it. The outermost
 /// call is made inside nothing, and says so with a name it leaves empty.
 fn began(said: Said<'_>, rest: &[String]) -> Result<(Call, Option<Id>), Failure> {
     let word = |key: &str| {
-        field(rest, key).ok_or_else(|| broken(format!("a BEGIN with no {key:?}"))).map(str::to_string)
+        field(rest, key)
+            .ok_or_else(|| broken(format!("a BEGIN with no {key:?}")))
+            .map(str::to_string)
     };
 
     let call = Call {
@@ -170,7 +202,12 @@ fn began(said: Said<'_>, rest: &[String]) -> Result<(Call, Option<Id>), Failure>
         stamp: said.message.stamp,
     };
 
-    Ok((call, Some(word("inside")?).filter(|inside| !inside.is_empty()).map(Id)))
+    Ok((
+        call,
+        Some(word("inside")?)
+            .filter(|inside| !inside.is_empty())
+            .map(Id),
+    ))
 }
 
 fn broken(what: impl Into<String>) -> Failure {

@@ -9,12 +9,12 @@ use std::fmt;
 use std::iter::once;
 
 use either::Either::{Left, Right};
-use hylic::prelude::{treeish, vec_fold, VecFold, VecHeap, FUSED};
+use hylic::prelude::{FUSED, VecFold, VecHeap, treeish, vec_fold};
 use serde::{Deserialize, Serialize};
 
 use super::nesting::Recorded;
-use crate::record::{Call, Complete, Record};
 use super::show;
+use crate::record::{Call, Complete, Record};
 
 /// One measured call, and the ones made inside it. A call that had not ended
 /// would not be here, so this is a [`Complete`] and everything under it.
@@ -54,23 +54,36 @@ impl Span {
         windows.sort_unstable();
         windows
             .iter()
-            .fold((0, began), |(covered, filled), &(from, upto)| {
-                (covered + upto.saturating_sub(from.max(filled)), filled.max(upto))
-            })
+            .fold(
+                (0, began),
+                |(covered, filled), &(from, upto)| {
+                    (
+                        covered + upto.saturating_sub(from.max(filled)),
+                        filled.max(upto),
+                    )
+                },
+            )
             .0
     }
 
     fn window(&self) -> (u64, u64) {
-        (self.complete.call.stamp.sent_at.0, self.complete.ended_at.0)
+        (
+            self.complete.call.stamp.sent_at.0,
+            self.complete.ended_at.0,
+        )
     }
 
     pub fn child(&self, label: &str) -> Option<&Span> {
-        self.children.iter().find(|span| span.complete.call.label == label)
+        self.children
+            .iter()
+            .find(|span| span.complete.call.label == label)
     }
 
     /// This span and everything under it, outermost first.
     pub fn all(&self) -> Vec<&Span> {
-        once(self).chain(self.children.iter().flat_map(Span::all)).collect()
+        once(self)
+            .chain(self.children.iter().flat_map(Span::all))
+            .collect()
     }
 }
 
@@ -119,7 +132,11 @@ impl Unfinished<'_> {
 
 impl fmt::Display for Unfinished<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let labels: Vec<&str> = self.unended().iter().map(|call| call.label.as_str()).collect();
+        let labels: Vec<&str> = self
+            .unended()
+            .iter()
+            .map(|call| call.label.as_str())
+            .collect();
 
         writeln!(f, "calls that never ended: {labels:?}")?;
         f.write_str(&Recorded::render(self.forest))
@@ -138,7 +155,10 @@ type Measured = Result<Span, Vec<Span>>;
 /// the only record that something below never ended, and it is the `collect`
 /// that produces it.
 fn measured(readings: &[Measured]) -> Option<Vec<Span>> {
-    readings.iter().map(|reading| reading.as_ref().ok().cloned()).collect()
+    readings
+        .iter()
+        .map(|reading| reading.as_ref().ok().cloned())
+        .collect()
 }
 
 /// Every complete measurement in these readings, in the order they began.
@@ -161,10 +181,14 @@ fn salvage(readings: &[Measured]) -> Vec<Span> {
 /// what pairing the node's own record with [`measured`] says.
 fn measuring() -> VecFold<Recorded, Measured> {
     vec_fold(|heap: &VecHeap<Recorded, Measured>| {
-        match (&heap.node.record, measured(&heap.childresults)) {
-            (Record::Ended(complete), Some(children)) => {
-                Ok(Span { complete: complete.clone(), children })
-            }
+        match (
+            &heap.node.record,
+            measured(&heap.childresults),
+        ) {
+            (Record::Ended(complete), Some(children)) => Ok(Span {
+                complete: complete.clone(),
+                children,
+            }),
             _ => Err(salvage(&heap.childresults)),
         }
     })
@@ -177,9 +201,13 @@ impl Profile {
         let fold = measuring();
         let shape = treeish(|node: &Recorded| node.children.to_vec());
 
-        let readings: Vec<Measured> =
-            forest.iter().map(|tree| FUSED.run(&fold, &shape, tree)).collect();
-        let resolved = Profile { roots: salvage(&readings) };
+        let readings: Vec<Measured> = forest
+            .iter()
+            .map(|tree| FUSED.run(&fold, &shape, tree))
+            .collect();
+        let resolved = Profile {
+            roots: salvage(&readings),
+        };
 
         match measured(&readings) {
             Some(_) => Ok(resolved),

@@ -12,31 +12,49 @@
 
 mod arithmetic;
 mod nesting;
+mod shipped;
 mod timing;
 mod unfinished;
 mod unread;
-mod shipped;
 mod walks;
 
 use std::collections::HashSet;
 
-use bash_interop::rig::{heard, Driving, ExitStatus, Provision};
-use crate::{recorded, BashProf, Call, Profile, Recorded, Span, Unread};
-use bash_interop::scratch::{bash, Scripts};
+use crate::{BashProf, Call, Profile, Recorded, Span, Unread, recorded};
+use bash_interop::rig::{Driving, ExitStatus, Provision, heard};
+use bash_interop::scratch::{Scripts, bash};
 
 /// Run a script under the profiler. What comes back is the tree as recorded —
 /// every call that began, ended or not. Reading it as timings is the caller's,
 /// which is what each test below does next.
 async fn profiled(script: &str) -> (Vec<Recorded>, ExitStatus) {
     let scripts = Scripts::of(&[("subject.bash", script)]);
-    let ran = BashProf.run(&bash(scripts.at("subject.bash")), |at| Ok(vec![at.bash_env(Provision::Joining(&crate::joining(at)))?])).await.unwrap().whole().unwrap();
+    let ran = BashProf
+        .run(
+            &bash(scripts.at("subject.bash")),
+            |at| {
+                Ok(vec![at.bash_env(
+                    Provision::Joining(&crate::joining(at)),
+                )?])
+            },
+        )
+        .await
+        .unwrap()
+        .whole()
+        .unwrap();
 
-    (recorded(&heard(&ran.shells)).expect("the instrument's own messages"), ran.subject)
+    (
+        recorded(&heard(&ran.shells)).expect("the instrument's own messages"),
+        ran.subject,
+    )
 }
 
 /// The labels of the calls that never ended.
 fn unended(forest: &[Recorded]) -> Vec<&str> {
-    Recorded::unended(forest).iter().map(|call| call.label.as_str()).collect()
+    Recorded::unended(forest)
+        .iter()
+        .map(|call| call.label.as_str())
+        .collect()
 }
 
 /// Every call in a recorded forest, outermost first.
@@ -51,7 +69,12 @@ fn calls(forest: &[Recorded]) -> Vec<&Call> {
 /// a path that does not exist is a failed assertion rather than a `None`.
 fn at<'a>(root: &'a Span, path: &[&str]) -> &'a Span {
     path.iter().fold(root, |span, label| {
-        span.child(label).unwrap_or_else(|| panic!("no {label:?} under {:?}", span.complete.call.label))
+        span.child(label).unwrap_or_else(|| {
+            panic!(
+                "no {label:?} under {:?}",
+                span.complete.call.label
+            )
+        })
     })
 }
 
@@ -96,9 +119,7 @@ const NESTED: &str = r#"
     BASHPROF_TIMETHIS outer f__outer
     "#;
 
-
 /// A µs budget for scheduling and for the `sleep` each pause forks. Wide,
 /// because the bound it guards only has to separate `a`'s own two pauses from
 /// the whole tree's time — an order of magnitude apart.
 const SLACK: u64 = 60_000;
-

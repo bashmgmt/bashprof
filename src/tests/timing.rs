@@ -12,7 +12,10 @@ async fn a_spans_time_covers_its_own_work_and_everything_it_called() {
         (&["e", "f"][..], 50_000),
         (&["b"][..], 30_000 + 10_000 + 40_000),
         (&["e"][..], 10_000 + 50_000),
-        (&[][..], 20_000 + 80_000 + 20_000 + 60_000),
+        (
+            &[][..],
+            20_000 + 80_000 + 20_000 + 60_000,
+        ),
     ] {
         let span = at(a, path);
         assert!(
@@ -30,8 +33,16 @@ async fn a_spans_time_covers_its_own_work_and_everything_it_called() {
     );
 
     let leaf = at(a, &["e", "f"]);
-    assert_eq!(leaf.exclusive(), leaf.complete.took(), "nothing is measured inside f");
+    assert_eq!(
+        leaf.exclusive(),
+        leaf.complete.took(),
+        "nothing is measured inside f"
+    );
 
     let total: u64 = a.all().iter().map(|span| span.exclusive()).sum();
-    assert_eq!(total, a.complete.took(), "exclusive times partition the root's\n{profile}");
+    assert_eq!(
+        total,
+        a.complete.took(),
+        "exclusive times partition the root's\n{profile}"
+    );
 }
