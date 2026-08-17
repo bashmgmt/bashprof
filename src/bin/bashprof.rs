@@ -256,13 +256,23 @@ async fn serve(reading: &Reading, at: &std::path::Path) -> Result<(), Failure> {
 }
 
 /// The run as a forest, and a word on stderr for every source path a frame
-/// names and does not have. Not a failure: a subject that changed directory
-/// after sourcing, or a workspace the run threw away, leaves paths that were
-/// true when they were written.
+/// names and does not have, under one line saying why they can be gone. A
+/// subject that changed directory after sourcing, or a workspace the run threw
+/// away, leaves paths that were true when they were written.
 fn read(heard: &[Said<'_>]) -> Result<Vec<Recorded>, Unread> {
     let forest = recorded(heard);
+    let missing = Recorded::missing(forest.as_ref().unwrap_or_else(|unread| &unread.resolved));
 
-    for path in Recorded::missing(forest.as_ref().unwrap_or_else(|unread| &unread.resolved)) {
+    if !missing.is_empty() {
+        eprintln!(
+            "bashprof: a frame keeps the source path bash wrote at the time, and the \
+             paths below are gone — this run's workspace was temporary, and a subject \
+             that changed directory leaves a relative one pointing nowhere. The \
+             measurements are unaffected."
+        );
+    }
+
+    for path in missing {
         eprintln!(
             "bashprof: no source at {}",
             path.display()

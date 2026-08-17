@@ -1,6 +1,6 @@
 [package]
 name = "bashprof"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "Time a tree of calls in a bash program: spans travel on the wire as messages, nothing is timed or inferred in bash."
 license = "MIT"
