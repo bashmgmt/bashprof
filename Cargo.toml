@@ -3,11 +3,11 @@ name = "bashprof"
 version = "0.1.0"
 edition = "2024"
 description = "Time a tree of calls in a bash program: spans travel on the wire as messages, nothing is timed or inferred in bash."
+license = "MIT"
 readme = "README.md"
-repository = "https://github.com/simlei/bashprof"
+repository = "https://github.com/bashmgmt/bashprof"
 keywords = ["bash", "shell", "profiling", "timing", "tracing"]
 categories = ["development-tools::profiling", "command-line-utilities"]
-exclude = [".plans/**"]
 
 [dependencies]
 bash-interop = "*"

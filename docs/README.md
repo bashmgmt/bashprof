@@ -8,5 +8,5 @@ messages, nothing is timed or inferred in bash.
 | [bashprof.md](bashprof.md) | the word, the records, the tree, the timings, the two verbs |
 
 The core's book — sessions, rigs, joining, the wire — is
-`bash-interop/docs/` in its own repository; this book covers only what
+[bash-interop's book](https://bashmgmt.github.io/bash-interop/) in its own repository; this book covers only what
 bashprof adds.
