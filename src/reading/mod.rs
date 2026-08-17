@@ -29,8 +29,9 @@ pub use timings::{Profile, Span, Unfinished};
 /// What a run recorded, as the tree its calls made: every call that began,
 /// whether or not it ended.
 ///
-/// Reading that as measurements is [`Profile::of`], and the caller's — a test
-/// bails on a run that died mid-call, a tool reporting what it has need not.
+/// Reading that as measurements is [`Profile::of`], and what an unfinished
+/// call means is left to the caller — a test bails on a run that died
+/// mid-call, a tool reporting what it has need not.
 pub fn recorded(heard: &[Said<'_>]) -> Result<Vec<Recorded>, Unread> {
     let (records, mut unreadable) = records::records(heard);
     let read = records.len();

@@ -19,7 +19,7 @@ bashprof serve --at DIR --into FILE [--output …]
 
 | | who starts the shells | how they are reached | its exit code |
 |---|---|---|---|
-| `run` | the tool, from the command line it was given | `BASHPROF_SESSION` in the environment always; `--reach bash-env` (the default) also `BASH_ENV`, so the whole process tree joins; `--reach by-hand` leaves it to the scripts | the subject's |
+| `run` | the tool, from the command line it was given | `BASHPROF_SESSION` in the environment always; `--reach bash-env` (the default) also `BASH_ENV`, so the whole process tree joins; `--reach by-hand` leaves it to the scripts | whatever the subject exited with |
 | `serve` | a bash script, which named and made the workspace (`--at`, required, existing) and started this process as a coprocess | its own choice — the workspace is the address; the join fifo in it says the session is up, and the script sources the laid files and initiates by the same dir (`BASHPROF_INIT`) | its own: 0, or 1 if the reading did not come out |
 
 `serve` is the shipped half of a client's own coprocess —
@@ -151,7 +151,8 @@ BASHPROF_TIMETHIS() {
 Three declarations in that frame do the work. `__BP_id` is declared
 empty and filled by `__bp_begin`, so the END can name the same call.
 `__BP_inside` takes this call's name only after the BEGIN went out, the BEGIN
-having read the enclosing call's, which is what places this one in the tree.
+having read the name of the enclosing call, which is what places this one in
+the tree.
 `__BASHPROF_STACK_SHIFT` is reset beside it, covered in the next section. All
 three reach everything inside `"$@"`, because a caller's locals are the
 callee's environment ([bash-interop: scoping](https://bashmgmt.github.io/bash-interop/scoping.html)).
@@ -176,8 +177,8 @@ __bp_begin() {
 ```
 
 The separate frame is what makes the `IFS` handling work. Every join in it is
-`[*]@Q` under a `local IFS=' '`, and that local has to die before `"$@"` runs,
-so the subject has its own `IFS` back, unset included, before anything measured
+`[*]@Q` under a `declare IFS=' '`, and that binding has to die before `"$@"`
+runs, so the subject has its `IFS` back, unset included, before anything measured
 runs. The 3 counts `__bc_stack`'s frame, `__bp_begin`'s and the word's, so the
 walk points at the subject, and a wrapper's declared shift adds to it. What a
 stack of function layers would cost instead is measured in
@@ -220,8 +221,8 @@ Two calls under one name would close each other's spans and claim each other's
 children, so the name has to be unique across a run's whole process tree. The
 two halves cover the two ways it could fail.
 
-`$BASHPID` differs in every process, by definition. `__BP_made`, which is not
-`local`, is one count per shell spanning every call that shell makes; a fork
+`$BASHPID` differs in every process, by definition. `__BP_made`, which no
+frame declares, is one count per shell spanning every call that shell makes; a fork
 inherits the count and advances its own copy, under its own pid, so the two
 never meet.
 

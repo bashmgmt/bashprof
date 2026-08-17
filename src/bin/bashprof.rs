@@ -45,8 +45,8 @@ enum What {
 
         /// The wrapped command, program included — `bash build.bash`, or
         /// `make test`, whose own shells join too. Everything from the first
-        /// plain word on is the subject's; a command that itself starts with a
-        /// dash goes behind `--`.
+        /// plain word on belongs to the subject; a command that itself starts
+        /// with a dash goes behind `--`.
         #[arg(trailing_var_arg = true, required = true)]
         argv: Vec<String>,
     },

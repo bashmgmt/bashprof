@@ -51,9 +51,9 @@ BASHPROF_TIMETHIS() {
 }
 
 # The BEGIN, in a frame of its own so `IFS` is taken here and given back —
-# including an `IFS` that was unset — before anything of the subject's runs.
-# Every join below is `[*]@Q` and uses the caller's, and a subject with one
-# of its own would corrupt them.
+# including an `IFS` that was unset — before any subject code runs. Every join
+# below is `[*]@Q` and reads whatever `IFS` is in scope, and a subject that set
+# its own would corrupt them.
 #
 # 3 is `__bc_stack`'s own frame, this one, and the word's; the shift a caller
 # asked for adds to it. Read through `:-0` because an unset name inside `(( ))`
@@ -65,7 +65,7 @@ BASHPROF_TIMETHIS() {
 # is unset until the first measured call, and read through `:-0` for the same
 # reason as the shift above.
 #
-# `__BP_inside` is not the word's yet: it resolves to the enclosing call's,
+# `__BP_inside` does not name this call yet: it resolves to the enclosing one,
 # which is what makes this BEGIN name the caller's call rather than its own.
 __bp_begin() {
     declare IFS=' '
